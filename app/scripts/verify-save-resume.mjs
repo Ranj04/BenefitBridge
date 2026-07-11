@@ -56,10 +56,12 @@ const gate = (name, ok, detail = '') => {
 
 function serveDist() {
   const server = http.createServer(async (req, res) => {
-    const path = req.url.split('?')[0];
+    // the export is built with baseUrl /app (App Platform same-origin deploy) — strip it here
+    const path = req.url.split('?')[0].replace(/^\/app(\/|$)/, '/');
+    const target = path === '/' ? '/index.html' : path;
     try {
-      const file = await readFile(join(DIST, path === '/' ? 'index.html' : path));
-      res.writeHead(200, { 'content-type': MIME[extname(path)] ?? 'application/octet-stream' });
+      const file = await readFile(join(DIST, target));
+      res.writeHead(200, { 'content-type': MIME[extname(target)] ?? 'application/octet-stream' });
       res.end(file);
     } catch {
       const index = await readFile(join(DIST, 'index.html'));
