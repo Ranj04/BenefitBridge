@@ -69,9 +69,9 @@ Since we collect income and immigration status, PII handling is strict: profiles
 | Layer | Choice |
 |---|---|
 | Engine + API | TypeScript, Fastify v4, `tsx`, native fetch + AbortController, vitest |
-| Agents | DigitalOcean Gradient AI — agents, knowledge bases, guardrails, function routing, evaluations, traces |
+| Agents | DigitalOcean Gradient AI — agents, knowledge bases, guardrails, function routing, platform evaluations (results: `docs/evaluations.md`); plus local request traces in `traces/` and a labeled-persona accuracy harness in `tests/accuracy.test.ts` |
 | Frontend | Expo + react-native-web + NativeWind (one universal iOS + web app) |
-| Hosting | DO App Platform (API + web), Spaces (filled PDFs, KB sources), Managed OpenSearch (KB vectors) |
+| Hosting | DO App Platform (API + web), Managed OpenSearch (KB vectors). Filled PDFs are generated per-request on the engine and served from `/files/:name` — nothing is retained server-side (a deliberate PII choice; Spaces would add durable storage we don't want) |
 | Data track | ACS/Census income-by-tract + DataSF uptake data → a benefits-gap map of eligible-but-unenrolled residents per SF neighborhood |
 
 Money math is integer cents in `bigint`, end to end. Fastify stays on v4, axios is banned in favor of native fetch, and no eligibility logic ever runs through a model.

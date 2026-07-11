@@ -123,6 +123,12 @@ describe('EITC (federal, TY2026) — verified Rev. Proc. 2025-32 table', () => {
     }
   });
 
+  // Pairs with TODO(VERIFY) at src/programs/eitc.ts:34 — FTB publishes CalEITC
+  // as a table, not closed-form parameters; until that curve is encoded as
+  // verified data, the amount stays null (asserted below) and this .todo is
+  // the standing-rules marker for the pending constant.
+  it.todo('CalEITC: exact credit amount once the full FTB 2026 curve is encoded as verified data (ftb.ca.gov CalEITC table)');
+
   it('CalEITC: within the $32,900 cap → likely_qualify with NO invented amount; over → unlikely', () => {
     const results = screenEitc({ ...base, monthlyGrossIncome: 2500, earnedIncome: 2500 });
     const cal = results.find((r) => r.program === 'CalEITC')!;

@@ -15,6 +15,7 @@ export function SaveToggle({ t, enabled, onToggle }: { t: Strings; enabled: bool
         accessibilityRole="switch"
         accessibilityLabel={t.saveProgress}
         accessibilityState={{ checked: enabled }}
+        aria-checked={enabled}
       >
         <View
           className={`h-7 w-12 justify-center rounded-full border-2 px-0.5 ${enabled ? 'border-pine bg-pine' : 'border-fog bg-hearth-surface'}`}
