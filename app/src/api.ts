@@ -18,7 +18,14 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const api = {
-  chat: (text: string) => post<ChatResponse>('/chat', { text }),
+  // preferredLanguage rides inside the free text (a stated preference the
+  // intake agent extracts into HouseholdProfile.preferredLanguage) — a pure
+  // frontend pass-through; /chat's contract ({ text }) is unchanged, no
+  // backend edit. The agent already explains results in that language.
+  chat: (text: string, preferredLanguageHint?: string) =>
+    post<ChatResponse>('/chat', {
+      text: preferredLanguageHint ? `${text}\n\n(My preferred language is ${preferredLanguageHint}.)` : text,
+    }),
   screen: (profile: NullableProfile) => post<ScreeningResult[]>('/screen', profile),
   fill: (profile: NullableProfile) => post<FilledApplication>('/fill', { profile, program: 'CalFresh' }),
   adversarial: () => post<AdversarialResult>('/adversarial-test', {}),

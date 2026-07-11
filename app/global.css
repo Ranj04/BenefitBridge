@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Web-only a11y + polish; native ignores pseudo-selectors. */
+@layer base {
+  /* Visible keyboard focus on every control (react-native-web strips the
+     default outline on some elements). Pine ring on warm bone reads clearly. */
+  :focus-visible {
+    outline: 3px solid #245448 !important;
+    outline-offset: 2px;
+  }
+  body {
+    background-color: #f0eee6;
+  }
+  /* Preflight's gray-400 placeholder fails contrast on our warm surface;
+     ink-muted (#5A5E54) is 6.36:1 on the card surface. */
+  input::placeholder,
+  textarea::placeholder {
+    color: #5a5e54 !important;
+    opacity: 1;
+  }
+}

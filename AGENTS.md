@@ -1,10 +1,10 @@
-# AGENTS.md
+# CLAUDE.md
 
-Guidance for Codex sessions in this repo. BenefitBridge is a public-benefits screener built for the AI for Social Good hackathon (MLH × DigitalOcean). Read `README.md` for the product and architecture; read `benefitbridge-Codex-full-sequence.md` for the phased build plan before starting any implementation work.
+Guidance for Codex sessions in this repo. BenefitBridge is a public-benefits screener built for the AI for Social Good hackathon (MLH × DigitalOcean). Read `README.md` for the product and architecture; read `benefitbridge-claude-code-full-sequence.md` for the phased build plan before starting any implementation work.
 
 ## Current state
 
-Early implementation. The repo holds the master plan, the per-phase Codex prompts, and the first landed code (Person A's Gradient graph scaffold under `src/`, `scripts/`, `do-function/` — see `README-personA.md`). Implementation lands phase by phase. Before creating anything, inspect what already exists (`git status`, `ls`, read the files) and reconcile with it — never clobber or duplicate partial work.
+Early implementation. The repo holds the master plan, the per-phase Claude Code prompts, and the first landed code (Person A's Gradient graph scaffold under `src/`, `scripts/`, `do-function/` — see `README-personA.md`). Implementation lands phase by phase. Before creating anything, inspect what already exists (`git status`, `ls`, read the files) and reconcile with it — never clobber or duplicate partial work.
 
 ## Architecture rule (non-negotiable)
 
@@ -27,7 +27,7 @@ Integer cents, pure `bigint`, everywhere. No floats on any money path. Convert d
 
 Constants marked verified in the phase prompts can be used as given. Anything else (allotments, deductions, caps, thresholds) must be pulled from the cited official source (CDSS, USDA FNS, IRS, CA FTB) and stored with `source_url` + `as_of`. If a constant can't be verified, leave `// TODO(VERIFY): <what> from <source>` and mark the dependent test `.todo`. Never guess a number into shipping code.
 
-**Already verified (usable as given):** `benefitbridge-Codex-phase0-1.md` provides the CalFresh FY2026 gross (200% FPL) and net (100% FPL) monthly income-limit tables by household size (`as_of: 2026-07-10`). Max allotment, standard deduction, excess-shelter cap, SUA, and medical threshold are NOT provided — pull them from official CDSS FFY2026 sources.
+**Already verified (usable as given):** `benefitbridge-claude-code-phase0-1.md` provides the CalFresh FY2026 gross (200% FPL) and net (100% FPL) monthly income-limit tables by household size (`as_of: 2026-07-10`). Max allotment, standard deduction, excess-shelter cap, SUA, and medical threshold are NOT provided — pull them from official CDSS FFY2026 sources.
 
 ## The filer boundary
 
@@ -52,10 +52,6 @@ Every figure is an estimate, labeled with a disclaimer, never a determination. M
 
 The shared types (`HouseholdProfile`, `ScreeningResult`, `FilledApplication`) are defined in the phase prompts and land in `src/contracts.ts`. Person A (Gradient layer) and Person B (engine/frontend) both build against them — don't change a contract unilaterally. `ScreeningResult.estimatedBenefit.period` distinguishes monthly benefits from annual lump sums (EITC); the UI must never mislabel one as the other.
 
-## RocketRide (AI pipeline tooling)
-
-If building AI pipelines, document processing, RAG, or data integration with RocketRide, read the docs in `.rocketride/docs/` first (start with `ROCKETRIDE_README.md`), per `.Codex/rules/rocketride.md`. Component schemas live in `.rocketride/schema/`.
-
 ## Key files
 
 | File | Purpose |
@@ -63,7 +59,7 @@ If building AI pipelines, document processing, RAG, or data integration with Roc
 | `README.md` | Product overview + architecture |
 | `README-personA.md` | Person A's Gradient graph: run order, console-only steps, frontend entry point |
 | `benefits-navigator-plan.md` | Master plan: vision, architecture, risks, demo script |
-| `benefitbridge-Codex-full-sequence.md` | All nine phase prompts, run order, standing rules |
-| `benefitbridge-Codex-phase0-1.md` | Phase 0–1: CalFresh engine + `/screen` endpoint |
-| `benefitbridge-Codex-prompt2-personA.md` | Phase 2: Gradient agent graph + guardrails |
-| `benefitbridge-Codex-prompt3.5-live-data.md` | Phase 3.5: live FPL data layer (HHS ASPE API) |
+| `benefitbridge-claude-code-full-sequence.md` | All nine phase prompts, run order, standing rules |
+| `benefitbridge-claude-code-phase0-1.md` | Phase 0–1: CalFresh engine + `/screen` endpoint |
+| `benefitbridge-claude-code-prompt2-personA.md` | Phase 2: Gradient agent graph + guardrails |
+| `benefitbridge-claude-code-prompt3.5-live-data.md` | Phase 3.5: live FPL data layer (HHS ASPE API) |

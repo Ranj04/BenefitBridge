@@ -1,17 +1,28 @@
 import './global.css';
-import { useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { Fraunces_600SemiBold, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
+import { AtkinsonHyperlegible_400Regular, AtkinsonHyperlegible_700Bold } from '@expo-google-fonts/atkinson-hyperlegible';
 import { api } from './src/api';
 import type { ChatResponse, FilledApplication, AdversarialResult } from './src/types';
-import { ResultCard } from './src/components/ResultCard';
-import { VerificationConsole } from './src/components/VerificationConsole';
-import { FilerPanel } from './src/components/FilerPanel';
+import { useVoiceInput } from './src/hooks/useVoiceInput';
+import { useVoiceOutput } from './src/hooks/useVoiceOutput';
+import { STRINGS, bcp47For, defaultLanguage, languageHint, type LangCode } from './src/i18n';
+import { T } from './src/theme/tokens';
+import { WelcomeScreen } from './src/screens/WelcomeScreen';
+import { IntakeScreen } from './src/screens/IntakeScreen';
+import { ResultsScreen } from './src/screens/ResultsScreen';
+import type { Persona } from './src/components/SeedPersonaChips';
+import { loadSession, saveSession, clearSession, hasMeaningfulProgress, type SavedSession } from './src/lib/localSession';
+import { ResumeBanner } from './src/components/ResumeBanner';
+import { ClearInfoButton } from './src/components/ClearInfoButton';
 import offlineFixture from './fixtures/offline.json';
 
 // Three one-click demo personas (Prompt 5 task 5).
-const PERSONAS = [
+const PERSONAS: readonly Persona[] = [
   { key: 'p1', label: 'Single parent · $2,800/mo', text: "I'm a single mom in SF, I make about $2,800 a month, one kid, renting for $1,800" },
   { key: 'p2', label: 'Senior alone · $1,900/mo', text: "I'm 68, live alone in San Francisco on $1,900 a month social security, rent is $1,500" },
   { key: 'p3', label: 'Over threshold · $2,700/mo', text: 'Single, no kids, San Francisco, I earn $2,700 a month, not renting' },
@@ -24,18 +35,73 @@ type Fixture = {
 };
 const FIXTURE = offlineFixture as unknown as Fixture;
 
+type Screen = 'welcome' | 'intake' | 'results';
+
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    AtkinsonHyperlegible_400Regular,
+    AtkinsonHyperlegible_700Bold,
+  });
+
+  const [screen, setScreen] = useState<Screen>('welcome');
   const [text, setText] = useState('');
+  const [lastRun, setLastRun] = useState<{ input: string; personaKey: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatResponse | null>(null);
   const [offline, setOffline] = useState(false);
-  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [lang, setLang] = useState<LangCode>(defaultLanguage);
+  // Save & resume: opt-in, on-device only, OFF every session until chosen.
+  const [saveEnabled, setSaveEnabled] = useState(false);
+  const saveEnabledRef = useRef(saveEnabled);
+  saveEnabledRef.current = saveEnabled;
+  const [resume, setResume] = useState<SavedSession | null>(null);
+  const t = STRINGS[lang];
+
+  // On open: surface a non-expired saved session (loadSession discards stale/invalid ones).
+  useEffect(() => {
+    let cancelled = false;
+    void loadSession().then((s) => {
+      if (!cancelled && s && hasMeaningfulProgress(s)) setResume(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Debounced autosave of inputs only (profile + step + draft text + language) —
+  // never results. The ref re-check keeps a late timer from writing after the
+  // user withdraws consent.
+  useEffect(() => {
+    if (!saveEnabled) return;
+    const id = setTimeout(() => {
+      if (!saveEnabledRef.current) return;
+      void saveSession({ profile: chat?.profile ?? null, flowStep: screen, intakeText: text, preferredLanguage: lang });
+    }, 600);
+    return () => clearTimeout(id);
+  }, [saveEnabled, chat, screen, text, lang]);
+
+  const toggleSave = (on: boolean) => {
+    setSaveEnabled(on);
+    if (!on) void clearSession(); // consent withdrawn → wipe immediately
+  };
+
+  // Voice is an input transform only: finalized speech appends to the SAME
+  // editable field the user types into; the user reviews and submits.
+  const voice = useVoiceInput({
+    lang: bcp47For(lang),
+    onFinal: (chunk) => setText((prev) => (prev.trim() ? `${prev.trim()} ${chunk}` : chunk)),
+  });
+  const tts = useVoiceOutput();
 
   const run = async (input: string, personaKey: string | null) => {
     setError(null);
     setChat(null);
-    setConsoleOpen(false);
+    setLastRun({ input, personaKey });
+    setScreen('results');
+    tts.stop();
     if (offline) {
       // OFFLINE MODE: labeled replay of a committed REAL capture — never silent.
       setChat(FIXTURE.personas[personaKey ?? 'p1'] ?? FIXTURE.personas.p1 ?? null);
@@ -43,7 +109,7 @@ export default function App() {
     }
     setBusy(true);
     try {
-      setChat(await api.chat(input));
+      setChat(await api.chat(input, languageHint(lang)));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -51,136 +117,170 @@ export default function App() {
     }
   };
 
+  const pickPersona = (p: Persona) => {
+    setText(p.text);
+    void run(p.text, p.key);
+  };
+
+  // Resume: restore inputs + step, then re-run /screen so every number is
+  // recomputed against current live data — saved results are never shown
+  // because results are never saved.
+  const resumeSaved = async () => {
+    const s = resume;
+    if (!s) return;
+    setResume(null);
+    setSaveEnabled(true); // they opted in last session and are continuing it
+    if (s.preferredLanguage === 'en' || s.preferredLanguage === 'es' || s.preferredLanguage === 'zh') setLang(s.preferredLanguage);
+    setText(s.intakeText);
+    if (!s.profile) {
+      setScreen('intake');
+      return;
+    }
+    setLastRun(s.intakeText ? { input: s.intakeText, personaKey: null } : null);
+    setError(null);
+    setChat(null);
+    setScreen('results');
+    setBusy(true);
+    try {
+      const results = await api.screen(s.profile);
+      setChat({ profile: s.profile, results, explanation: null, guard: null, needMoreInfo: null, agentLayer: 'live' });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startFresh = () => {
+    void clearSession();
+    setResume(null);
+  };
+
+  // "Clear my information": wipe the device store and reset every piece of
+  // in-memory state that came from the user.
+  const clearAll = () => {
+    void clearSession();
+    tts.stop();
+    setSaveEnabled(false);
+    setResume(null);
+    setText('');
+    setChat(null);
+    setError(null);
+    setLastRun(null);
+    setScreen('welcome');
+  };
+
+  if (!fontsLoaded) {
+    return (
+      <View className="flex-1 items-center justify-center" style={{ backgroundColor: T.bg }}>
+        <ActivityIndicator size="large" color={T.pine} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
-      <SafeAreaView className="flex-1 bg-slate-100" edges={['top']}>
-        <StatusBar style="light" />
-        <View className="bg-brand-dark px-4 pb-4 pt-3">
-          <View className="mx-auto w-full max-w-3xl">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-xl font-extrabold text-white">BenefitBridge</Text>
+      <SafeAreaView className="flex-1 bg-hearth" edges={['top']}>
+        <StatusBar style="dark" />
+
+        {/* Warm, quiet header — brand only; the trust talk lives in the screens. */}
+        <View className="border-b border-fog bg-hearth px-5 py-2">
+          <View className="mx-auto w-full max-w-2xl flex-row items-center justify-between">
+            {screen === 'welcome' ? (
+              <View />
+            ) : (
+              <View className="flex-row items-center gap-2">
+                <View className="h-2.5 w-2.5 rounded-full bg-glow" />
+                <Text className="font-display text-body text-ink">BenefitBridge</Text>
+              </View>
+            )}
+            <View className="flex-row items-center gap-2">
+              <ClearInfoButton t={t} onClear={clearAll} />
               <Pressable
-                className={`rounded-full border px-3 py-1 ${offline ? 'border-amber-300 bg-amber-400' : 'border-indigo-300'}`}
-                onPress={() => setOffline((o) => !o)}
-                accessibilityLabel="Toggle offline mode"
-              >
-                <Text className={`text-xs font-bold ${offline ? 'text-amber-950' : 'text-indigo-100'}`}>
-                  {offline ? 'OFFLINE MODE ON' : 'Offline mode'}
-                </Text>
+              className={`min-h-[48px] justify-center rounded-full border px-3 ${offline ? 'border-ember bg-ember-soft' : 'border-fog bg-hearth-surface'}`}
+              onPress={() => setOffline((o) => !o)}
+              accessibilityRole="button"
+              accessibilityLabel="Toggle offline demo mode"
+              accessibilityState={{ selected: offline }}
+            >
+              <Text className={`font-bodybold text-caption ${offline ? 'text-ember-text' : 'text-ink-muted'}`}>
+                {offline ? 'Offline demo: on' : 'Offline demo'}
+              </Text>
               </Pressable>
             </View>
-            <Text className="mt-1 text-xs text-indigo-200">
-              Every figure below is an estimate, never a determination. The model does language; the math is deterministic code.
-            </Text>
           </View>
         </View>
 
-        {offline && (
-          <View className="bg-amber-400 px-4 py-1.5">
-            <Text className="mx-auto w-full max-w-3xl text-center text-xs font-bold text-amber-950">
-              OFFLINE — replaying a captured real result (recorded from the live system)
+        {offline ? (
+          <View className="border-b border-ember bg-ember-soft px-5 py-2">
+            <Text className="mx-auto w-full max-w-2xl text-center font-bodybold text-caption text-ember-text">
+              Offline — replaying a captured real result (recorded from the live system)
             </Text>
           </View>
-        )}
+        ) : null}
 
-        <ScrollView className="flex-1" contentContainerClassName="px-4 py-4">
-          <View className="mx-auto w-full max-w-3xl">
-            <Text className="text-sm font-semibold text-slate-700">Tell us about your household — any language</Text>
-            <View className="mt-2 flex-row flex-wrap gap-2">
-              {PERSONAS.map((p) => (
-                <Pressable
-                  key={p.key}
-                  className="rounded-full border border-brand bg-white px-3 py-1.5"
-                  onPress={() => {
-                    setText(p.text);
-                    void run(p.text, p.key);
-                  }}
-                  accessibilityLabel={`Try persona: ${p.label}`}
-                >
-                  <Text className="text-xs font-semibold text-brand-dark">{p.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View className="mt-3 flex-row items-end gap-2">
-              <TextInput
-                className="min-h-[48px] flex-1 rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900"
-                multiline
-                placeholder='e.g. "single mom in SF, about $2,800 a month, one kid, renting"'
-                placeholderTextColor="#94a3b8"
-                value={text}
-                onChangeText={setText}
-                accessibilityLabel="Describe your household"
-              />
-              <Pressable
-                className="rounded-xl bg-brand px-4 py-3"
-                onPress={() => void run(text, null)}
-                disabled={busy || !text.trim()}
-                accessibilityLabel="Check my benefits"
-              >
-                <Text className="text-sm font-bold text-white">Check</Text>
-              </Pressable>
-            </View>
-
-            {busy && (
-              <View className="mt-6 items-center">
-                <ActivityIndicator size="large" color="#4f46e5" />
-                <Text className="mt-2 text-xs text-slate-500">Reading your situation → running the deterministic screen…</Text>
-              </View>
-            )}
-            {error && (
-              <View className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-3">
-                <Text className="text-xs text-rose-700">{error}</Text>
-              </View>
-            )}
-
-            {chat?.needMoreInfo && (
-              <View className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
-                <Text className="text-sm font-bold text-amber-800">We need a bit more to screen honestly</Text>
-                <Text className="mt-1 text-xs text-amber-900">
-                  Missing: {chat.needMoreInfo.join(', ')}. We never invent a number — add your monthly income and household size and
-                  we'll run the real screen.
-                </Text>
-              </View>
-            )}
-
-            {chat?.explanation && (
-              <View className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                <Text className="text-xs font-bold uppercase tracking-wide text-slate-500">What this means for you</Text>
-                <Text className="mt-1 text-sm leading-5 text-slate-800">{chat.explanation}</Text>
-              </View>
-            )}
-
-            {chat?.results && (
-              <View className="mt-4">
-                {chat.results.map((r) => (
-                  <ResultCard key={r.program} r={r} />
-                ))}
-
-                <Pressable
-                  className="mb-3 self-start rounded-xl border border-slate-400 bg-white px-3 py-2"
-                  onPress={() => setConsoleOpen((o) => !o)}
-                  accessibilityLabel="Toggle verification console"
-                >
-                  <Text className="text-xs font-bold text-slate-700">{consoleOpen ? 'Hide' : 'Show'} the math — Verification Console</Text>
-                </Pressable>
-
-                {consoleOpen && chat.profile && (
-                  <VerificationConsole
-                    profile={chat.profile}
-                    results={chat.results}
-                    guard={chat.guard}
-                    offline={offline}
-                    offlineAdversarial={FIXTURE.adversarial}
-                  />
-                )}
-
-                {chat.profile && chat.results.some((r) => r.program === 'CalFresh' && r.screening === 'likely_qualify') && (
-                  <FilerPanel profile={chat.profile} offline={offline} offlineFilled={FIXTURE.filled} />
-                )}
-              </View>
-            )}
-          </View>
+        <ScrollView className="flex-1" contentContainerClassName="flex-grow">
+          {resume && screen === 'welcome' ? <ResumeBanner t={t} onResume={() => void resumeSaved()} onStartFresh={startFresh} /> : null}
+          {screen === 'welcome' ? (
+            <WelcomeScreen
+              t={t}
+              lang={lang}
+              onChangeLang={(code) => {
+                tts.stop();
+                setLang(code);
+              }}
+              onStart={() => setScreen('intake')}
+              personas={PERSONAS}
+              onPersona={pickPersona}
+            />
+          ) : screen === 'intake' ? (
+            <IntakeScreen
+              t={t}
+              lang={lang}
+              onChangeLang={(code) => {
+                tts.stop();
+                setLang(code);
+              }}
+              text={text}
+              onChangeText={setText}
+              onSubmit={() => void run(text, null)}
+              voice={voice}
+              busy={busy}
+              onBack={() => setScreen('welcome')}
+              personas={PERSONAS}
+              onPersona={pickPersona}
+              saveEnabled={saveEnabled}
+              onToggleSave={toggleSave}
+            />
+          ) : (
+            <ResultsScreen
+              t={t}
+              lang={lang}
+              chat={chat}
+              busy={busy}
+              error={error}
+              offline={offline}
+              offlineAdversarial={FIXTURE.adversarial}
+              offlineFilled={FIXTURE.filled}
+              tts={tts}
+              onRetry={() => lastRun && void run(lastRun.input, lastRun.personaKey)}
+              onEdit={() => {
+                tts.stop();
+                setScreen('intake');
+              }}
+              onStartOver={() => {
+                tts.stop();
+                setText('');
+                setChat(null);
+                setError(null);
+                // A fresh run is fresh consent: stop saving and erase the old
+                // session (they may be handing the device to someone else).
+                setSaveEnabled(false);
+                void clearSession();
+                setScreen('welcome');
+              }}
+            />
+          )}
         </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>

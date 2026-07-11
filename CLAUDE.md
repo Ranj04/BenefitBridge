@@ -52,10 +52,6 @@ Every figure is an estimate, labeled with a disclaimer, never a determination. M
 
 The shared types (`HouseholdProfile`, `ScreeningResult`, `FilledApplication`) are defined in the phase prompts and land in `src/contracts.ts`. Person A (Gradient layer) and Person B (engine/frontend) both build against them — don't change a contract unilaterally. `ScreeningResult.estimatedBenefit.period` distinguishes monthly benefits from annual lump sums (EITC); the UI must never mislabel one as the other.
 
-## RocketRide (AI pipeline tooling)
-
-If building AI pipelines, document processing, RAG, or data integration with RocketRide, read the docs in `.rocketride/docs/` first (start with `ROCKETRIDE_README.md`), per `.claude/rules/rocketride.md`. Component schemas live in `.rocketride/schema/`.
-
 ## Key files
 
 | File | Purpose |
