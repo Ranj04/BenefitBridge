@@ -76,10 +76,19 @@ async function pickModels() {
     claudeCandidates.find((m) => /sonnet 4\.6|4\.5 sonnet/i.test(m.name)) ??
     claudeCandidates.find((m) => /sonnet 5|haiku 4\.5/i.test(m.name)) ??
     claudeCandidates[0];
+  // Order matters twice over:
+  // 1. Agents need DO-parseable function calling for the screen_calfresh route.
+  //    MiMo V2.5 emits its own XML tool_call syntax that DO's runtime does not
+  //    execute (verified 2026-07-10: raw <tool_call> text in the response) — last.
+  // 2. Models with an `agreement` (GPT-oss, Llama 3.3, Kimi K2.5, GLM 5) return
+  //    403 on agent create/update until their terms are accepted in the console.
+  //    GLM-5.2 is the strongest agreement-free model on the account.
   const fallbacks = [
-    models.find((m) => /^MiMo V2\.5$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^GLM-5\.2$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^Kimi K2\.6$/i.test(m.name) && isActive(m)),
+    models.find((m) => /GPT-oss-120b/i.test(m.name) && isActive(m)),
     models.find((m) => /llama 3\.3 instruct \(70B\)/i.test(m.name) && isActive(m)),
-    models.find((m) => /mistral nemo instruct/i.test(m.name) && isActive(m)),
+    models.find((m) => /^MiMo V2\.5$/i.test(m.name) && isActive(m)),
   ].filter(Boolean) as any[];
   const embedCandidates = models.filter(
     (m) => /embed/i.test(m.name) || (m.usecases ?? []).some((u: string) => /embed/i.test(u)),
@@ -257,6 +266,7 @@ async function main() {
   for (const [label, uuidKey, endpointKey, secretKey, keyDisplayName] of [
     ['intake', 'intakeAgentUuid', 'intakeEndpoint', 'intakeAgentKey', 'bb-intake-key'],
     ['router', 'routerAgentUuid', 'routerEndpoint', 'routerAgentKey', 'bb-router-key'],
+    ['food', 'foodAgentUuid', 'foodEndpoint', 'foodAgentKey', 'bb-food-key'],
   ] as const) {
     const uuid = state[uuidKey];
     const agent: any = await client.agents.retrieve(uuid);
