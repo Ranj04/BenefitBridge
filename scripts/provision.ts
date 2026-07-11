@@ -14,7 +14,7 @@
  * do-function/ proxy that forwards to SCREEN_URL) to register it; otherwise this
  * step is skipped and flagged.
  */
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeClient, pickUuid } from '../src/gradient.ts';
@@ -26,7 +26,7 @@ const STATE_PATH = resolve(fileURLToPath(new URL('../.gradient-state.json', impo
 const client = makeClient();
 
 type State = Record<string, string>;
-const state: State = {};
+const state: State = existsSync(STATE_PATH) ? JSON.parse(readFileSync(STATE_PATH, 'utf8')) : {};
 
 /**
  * DO's function-route API rejects raw JSON Schema ("parameters field is required"):
@@ -78,14 +78,14 @@ async function pickModels() {
     claudeCandidates[0];
   // Order matters twice over:
   // 1. Agents need DO-parseable function calling for the screen_calfresh route.
-  //    MiMo V2.5 emits its own XML tool_call syntax that DO's runtime does not
-  //    execute (verified 2026-07-10: raw <tool_call> text in the response) — last.
+  //    Kimi K2.6 and MiMo V2.5 can emit raw tool_call markup that DO's runtime
+  //    does not execute in the agent route (verified 2026-07-11) — keep them behind GLM.
   // 2. Models with an `agreement` (GPT-oss, Llama 3.3, Kimi K2.5, GLM 5) return
   //    403 on agent create/update until their terms are accepted in the console.
   //    GLM-5.2 is the strongest agreement-free model on the account.
   const fallbacks = [
-    models.find((m) => /^Kimi K2\.6$/i.test(m.name) && isActive(m)),
     models.find((m) => /^GLM-5\.2$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^Kimi K2\.6$/i.test(m.name) && isActive(m)),
     models.find((m) => /GPT-oss-120b/i.test(m.name) && isActive(m)),
     models.find((m) => /llama 3\.3 instruct \(70B\)/i.test(m.name) && isActive(m)),
     models.find((m) => /^MiMo V2\.5$/i.test(m.name) && isActive(m)),
