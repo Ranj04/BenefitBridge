@@ -169,6 +169,35 @@ async function ensureAgent(
   return uuid;
 }
 
+async function ensureFunctionRoute(agentUuid: string, faasNamespace: string, faasName: string) {
+  const body = {
+    function_name: RESOURCE_NAMES.screenFunction,
+    description:
+      'Deterministic CalFresh screen. Input: HouseholdProfile. Output: ScreeningResult[]. The ONLY source of eligibility outcomes and dollar amounts.',
+    faas_namespace: faasNamespace,
+    faas_name: faasName,
+    input_schema: toDoFunctionInputSchema(HouseholdProfileJsonSchema),
+    output_schema: DO_SCREEN_OUTPUT_SCHEMA,
+  };
+  const agent: any = await client.agents.retrieve(agentUuid);
+  const existing = (agent?.agent?.functions ?? agent?.functions ?? []).find(
+    (fn: any) => fn.name === RESOURCE_NAMES.screenFunction,
+  );
+
+  if (existing?.uuid) {
+    await client.agents.functions.update(existing.uuid, {
+      path_agent_uuid: agentUuid,
+      body_function_uuid: existing.uuid,
+      ...body,
+    });
+    console.log(`= updated function route "${RESOURCE_NAMES.screenFunction}" on Food agent`);
+    return;
+  }
+
+  await client.agents.functions.create(agentUuid, body);
+  console.log(`+ registered function route "${RESOURCE_NAMES.screenFunction}" on Food agent`);
+}
+
 async function main() {
   const projectId = (await resolveProjectId()) ?? config.projectId;
   if (!projectId) {
@@ -228,17 +257,9 @@ async function main() {
   const faasName = process.env.FAAS_NAME?.trim();
   if (faasNamespace && faasName) {
     try {
-      await client.agents.functions.create(state.foodAgentUuid, {
-        function_name: RESOURCE_NAMES.screenFunction,
-        description: 'Deterministic CalFresh screen. Input: HouseholdProfile. Output: ScreeningResult[]. The ONLY source of eligibility outcomes and dollar amounts.',
-        faas_namespace: faasNamespace,
-        faas_name: faasName,
-        input_schema: toDoFunctionInputSchema(HouseholdProfileJsonSchema),
-        output_schema: DO_SCREEN_OUTPUT_SCHEMA,
-      });
-      console.log(`+ registered function route "${RESOURCE_NAMES.screenFunction}" on Food agent`);
+      await ensureFunctionRoute(state.foodAgentUuid, faasNamespace, faasName);
     } catch (e: any) {
-      console.warn(`  [warn] function route create failed (may already exist): ${e.message}`);
+      console.warn(`  [warn] function route ensure failed: ${e.message}`);
     }
     state.functionRoute = `${faasNamespace}/${faasName}`;
   } else {
