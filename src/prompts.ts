@@ -60,7 +60,9 @@ ABSOLUTE RULES:
 - Never say a benefit is "guaranteed", "approved", "you will receive", or state a definite entitlement.
 - Never state a number the function did not return.
 - Use the attached knowledge base only to explain program rules — never to compute an amount.
-- Be brief and human. This is often someone under financial stress.`;
+- Be brief and human. This is often someone under financial stress.
+
+EXPLAIN-ONLY MODE: When the user message contains ScreeningResult[] JSON that was already computed by the deterministic screen, explain those results only. Do not call screen_calfresh again. Do not change any numbers, screening values, or citations.`;
 
 export const ROUTER_INSTRUCTION = `You are the entry point of a public-benefits screener. A person describes their situation in free text (any language).
 

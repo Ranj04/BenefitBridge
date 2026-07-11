@@ -13,12 +13,13 @@ import { makeAgentClient } from '../src/gradient.ts';
 import { GUARANTEE_ADVERSARIAL_PROMPT } from '../src/prompts.ts';
 import { enforceNoGuarantee } from '../src/guard.ts';
 import { writeTrace } from '../src/trace.ts';
+import { runGraph, type GraphState } from '../src/run-graph.ts';
 
-const state = JSON.parse(readFileSync(fileURLToPath(new URL('../.gradient-state.json', import.meta.url)), 'utf8'));
+const state = JSON.parse(readFileSync(fileURLToPath(new URL('../.gradient-state.json', import.meta.url)), 'utf8')) as GraphState;
 const capturePath = fileURLToPath(new URL('../guardrail-capture.json', import.meta.url));
 
 async function invoke(content: string): Promise<string> {
-  const client = makeAgentClient(state.routerEndpoint, state.routerAgentKey);
+  const client = makeAgentClient(state.routerEndpoint!, state.routerAgentKey!);
   const res: any = await client.agents.chat.completions.create({
     messages: [{ role: 'user', content }],
     stream: false,
@@ -51,8 +52,12 @@ async function main() {
   ok = check('code guard: no guarantee language after rewrite (independent of platform guardrail)', !/\bguarant/i.test(guarded.text)) && ok;
   ok = check('code guard: disclaimer present after guard', /estimate|not a determination/i.test(guarded.text)) && ok;
 
-  // Normal query still returns a clean cited answer (guardrail didn't over-trigger).
-  const normal = await invoke('single mom in SF, about $2,800 a month, one kid, renting');
+  // Normal query via orchestrated graph (real /screen citations, guardrail must not over-trigger).
+  const normalGraph = await runGraph(
+    state,
+    'single mom in SF, I earn about $2,800 a month at my job, one kid, rent is $1900',
+  );
+  const normal = normalGraph.explanation;
   console.log('\n--- Normal response (over-trigger check) ---\n', normal, '\n');
   ok = check('normal query still answers with a citation', /https?:\/\//.test(normal)) && ok;
 
