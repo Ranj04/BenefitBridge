@@ -133,9 +133,19 @@ export async function runChat(
   }
 
   const intakeRaw = await chatCompletion(cfg.intake.url, cfg.intake.key, freeText, INTAKE_TIMEOUT_MS);
-  const parsed = parseProfileJson(intakeRaw);
+  // Degrade gracefully: if the intake agent can't turn the text into a valid
+  // profile (e.g. gibberish or a refusal → prose, not JSON), ask for the
+  // essentials instead of throwing a 502 (which the DO edge renders as a 504).
+  let parsed: NullableProfile;
+  try {
+    parsed = parseProfileJson(intakeRaw);
+  } catch {
+    return { profile: null, results: null, explanation: null, guard: null, needMoreInfo: ['householdSize', 'monthlyGrossIncome'], agentLayer: 'live' };
+  }
   const v = validateProfile(parsed);
-  if (!v.ok) throw new Error(`intake produced an invalid profile: ${v.errors.join('; ')}`);
+  if (!v.ok) {
+    return { profile: parsed, results: null, explanation: null, guard: null, needMoreInfo: ['householdSize', 'monthlyGrossIncome'], agentLayer: 'live' };
+  }
 
   const completed = completeProfile(parsed);
   if ('missing' in completed) {
