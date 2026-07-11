@@ -6,13 +6,11 @@
  * The numbers here are illustrative placeholders for wiring only. They are NOT a
  * real CalFresh computation and are labeled as such; the real engine is Person B's.
  */
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
 import { config } from './config.ts';
 
-const app = Fastify({ logger: false });
-
-function mockCalfresh(p: HouseholdProfile): ScreeningResult {
+export function mockCalfresh(p: HouseholdProfile): ScreeningResult {
   const disclaimer =
     'Estimate, not a determination. Confirm with San Francisco HSA. (MOCK DATA — wiring only.)';
   const citations = [
@@ -74,22 +72,34 @@ function mockCalfresh(p: HouseholdProfile): ScreeningResult {
   };
 }
 
-app.post('/screen', async (req, reply) => {
-  const p = req.body as HouseholdProfile;
-  if (!p || typeof p.householdSize !== 'number' || typeof p.monthlyGrossIncome !== 'number') {
-    return reply.code(400).send({ error: 'Invalid HouseholdProfile: householdSize and monthlyGrossIncome are required numbers.' });
-  }
-  const results: ScreeningResult[] = [mockCalfresh(p)];
-  return reply.send(results);
-});
+/** Build the mock server. Exported so tests can use app.inject() without binding a port. */
+export function buildMockApp(): FastifyInstance {
+  const app = Fastify({ logger: false });
 
-app.get('/health', async () => ({ ok: true, mock: true }));
-
-const port = config.mockPort;
-app
-  .listen({ port, host: '0.0.0.0' })
-  .then(() => console.log(`[MOCK /screen] listening on http://localhost:${port}/screen  (NOT the real engine)`))
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
+  app.post('/screen', async (req, reply) => {
+    const p = req.body as HouseholdProfile;
+    if (!p || typeof p.householdSize !== 'number' || typeof p.monthlyGrossIncome !== 'number') {
+      return reply
+        .code(400)
+        .send({ error: 'Invalid HouseholdProfile: householdSize and monthlyGrossIncome are required numbers.' });
+    }
+    const results: ScreeningResult[] = [mockCalfresh(p)];
+    return reply.send(results);
   });
+
+  app.get('/health', async () => ({ ok: true, mock: true }));
+  return app;
+}
+
+// Only bind a port when run directly (npm run mock), not when imported by tests.
+const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  const port = config.mockPort;
+  buildMockApp()
+    .listen({ port, host: '0.0.0.0' })
+    .then(() => console.log(`[MOCK /screen] listening on http://localhost:${port}/screen  (NOT the real engine)`))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

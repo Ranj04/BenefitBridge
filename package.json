@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Person A — DigitalOcean Gradient AI agent graph for BenefitBridge (Hearth)",
   "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "mock": "tsx src/mock-screen.ts",
     "provision": "tsx scripts/provision.ts",
     "resources:list": "tsx scripts/list-resources.ts",
