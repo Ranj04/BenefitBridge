@@ -14,7 +14,7 @@ Verified live against the DigitalOcean API on 2026-07-11.
 | Food domain (CalFresh) | `bb-food-calfresh-agent` | `37c460cf-7ce3-11f1-aee4-4e013e2ddde4` | `https://k27cwswncylretywmhlgmjrr.agents.do-ai.run` |
 | Intake (free text → HouseholdProfile) | `bb-intake-agent` | `12e74db0-7ce3-11f1-aee4-4e013e2ddde4` | `https://wldkgxkzoccd2m6rm7vxokus.agents.do-ai.run` |
 
-Model: Kimi K2.6. Router child-routes to the Food agent. Chat is the
+Model: OpenAI GPT-4o. Router child-routes to the Food agent. Chat is the
 OpenAI-compatible `POST {endpoint}/api/v1/chat/completions` with an agent
 access key (keys live in `.gradient-state.json` / `.env` on the provisioning
 machine — never in git, never in this file).

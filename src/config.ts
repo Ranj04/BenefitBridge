@@ -42,8 +42,9 @@ export const config = {
   /** Present only when needed by a script; read lazily via requireEnv there. */
   region: process.env.DO_REGION?.trim() || 'tor1',
   projectId: process.env.DO_PROJECT_ID?.trim() || undefined,
-  /** Falls back to the local mock so the graph is buildable before Person B deploys. */
-  screenUrl: process.env.SCREEN_URL?.trim() || 'http://localhost:8787/screen',
+  /** Live Person B /screen on App Platform (Phase A3). Override with SCREEN_URL in .env. */
+  screenUrl:
+    process.env.SCREEN_URL?.trim() || 'https://benefitbridge-screen-eh945.ondigitalocean.app/screen',
   mockPort: Number(process.env.MOCK_PORT ?? 8787),
 };
 
