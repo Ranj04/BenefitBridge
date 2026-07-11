@@ -1,0 +1,306 @@
+{
+  "version": 5,
+  "generated_at": "2026-07-11T08:11:21.706Z",
+  "entries": {
+    "fpl.annual.2026.us.hh1": {
+      "key": "fpl.annual.2026.us.hh1",
+      "value": 15960,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2026/us/1",
+        "as_of": "2026",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "7e7f35eafa8f0e63"
+      }
+    },
+    "fpl.annual.2026.us.hh2": {
+      "key": "fpl.annual.2026.us.hh2",
+      "value": 21640,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2026/us/2",
+        "as_of": "2026",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "73ad46f67b094f07"
+      }
+    },
+    "fpl.annual.2026.us.hh3": {
+      "key": "fpl.annual.2026.us.hh3",
+      "value": 27320,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2026/us/3",
+        "as_of": "2026",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "11e4a74f2448f9c1"
+      }
+    },
+    "fpl.annual.2026.us.hh4": {
+      "key": "fpl.annual.2026.us.hh4",
+      "value": 33000,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2026/us/4",
+        "as_of": "2026",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "7d22d2deba1f3a43"
+      }
+    },
+    "fpl.annual.2026.us.hh5": {
+      "key": "fpl.annual.2026.us.hh5",
+      "value": 38680,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2026/us/5",
+        "as_of": "2026",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "493faac072916dd3"
+      }
+    },
+    "fpl.annual.2026.us.hh6": {
+      "key": "fpl.annual.2026.us.hh6",
+      "value": 44360,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2026/us/6",
+        "as_of": "2026",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "7e4b05abf16179bd"
+      }
+    },
+    "fpl.annual.2026.us.hh7": {
+      "key": "fpl.annual.2026.us.hh7",
+      "value": 50040,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2026/us/7",
+        "as_of": "2026",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "6cc5969e7b247115"
+      }
+    },
+    "fpl.annual.2026.us.hh8": {
+      "key": "fpl.annual.2026.us.hh8",
+      "value": 55720,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2026/us/8",
+        "as_of": "2026",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "51ebb18cfda9c572"
+      }
+    },
+    "fpl.annual.2025.us.hh1": {
+      "key": "fpl.annual.2025.us.hh1",
+      "value": 15650,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2025/us/1",
+        "as_of": "2025",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "1740f86922944273"
+      }
+    },
+    "fpl.annual.2025.us.hh2": {
+      "key": "fpl.annual.2025.us.hh2",
+      "value": 21150,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2025/us/2",
+        "as_of": "2025",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "48ff6cf0c4990494"
+      }
+    },
+    "fpl.annual.2025.us.hh3": {
+      "key": "fpl.annual.2025.us.hh3",
+      "value": 26650,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2025/us/3",
+        "as_of": "2025",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "d1849ef0df16234b"
+      }
+    },
+    "fpl.annual.2025.us.hh4": {
+      "key": "fpl.annual.2025.us.hh4",
+      "value": 32150,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2025/us/4",
+        "as_of": "2025",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "8ee22274f9c57497"
+      }
+    },
+    "fpl.annual.2025.us.hh5": {
+      "key": "fpl.annual.2025.us.hh5",
+      "value": 37650,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2025/us/5",
+        "as_of": "2025",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "a11278da17db4d83"
+      }
+    },
+    "fpl.annual.2025.us.hh6": {
+      "key": "fpl.annual.2025.us.hh6",
+      "value": 43150,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2025/us/6",
+        "as_of": "2025",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "fa766e29dd69d405"
+      }
+    },
+    "fpl.annual.2025.us.hh7": {
+      "key": "fpl.annual.2025.us.hh7",
+      "value": 48650,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2025/us/7",
+        "as_of": "2025",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "8c600ac353cea85c"
+      }
+    },
+    "fpl.annual.2025.us.hh8": {
+      "key": "fpl.annual.2025.us.hh8",
+      "value": 54150,
+      "provenance": {
+        "source_url": "https://aspe.hhs.gov/topics/poverty-economic-mobility/poverty-guidelines/api/2025/us/8",
+        "as_of": "2025",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "0c170b7be03c9435"
+      }
+    },
+    "calfresh.grossLimit.hh1": {
+      "key": "calfresh.grossLimit.hh1",
+      "value": 2610,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "9d45a4710a9abc4e"
+      }
+    },
+    "calfresh.netLimit.hh1": {
+      "key": "calfresh.netLimit.hh1",
+      "value": 1305,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "c7f4f146491d27ee"
+      }
+    },
+    "calfresh.grossLimit.hh2": {
+      "key": "calfresh.grossLimit.hh2",
+      "value": 3526,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "7f489ad8915c281e"
+      }
+    },
+    "calfresh.netLimit.hh2": {
+      "key": "calfresh.netLimit.hh2",
+      "value": 1763,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "9a0d49266d4f5e24"
+      }
+    },
+    "calfresh.grossLimit.hh3": {
+      "key": "calfresh.grossLimit.hh3",
+      "value": 4442,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "3b9f84399baa1776"
+      }
+    },
+    "calfresh.netLimit.hh3": {
+      "key": "calfresh.netLimit.hh3",
+      "value": 2221,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "0337d6fcd298bc66"
+      }
+    },
+    "calfresh.grossLimit.hh4": {
+      "key": "calfresh.grossLimit.hh4",
+      "value": 5360,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "c702d852a09d5ac8"
+      }
+    },
+    "calfresh.netLimit.hh4": {
+      "key": "calfresh.netLimit.hh4",
+      "value": 2680,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "bda5459a0e2644a2"
+      }
+    },
+    "calfresh.grossLimit.hh5": {
+      "key": "calfresh.grossLimit.hh5",
+      "value": 6276,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "09cb71299e9ded35"
+      }
+    },
+    "calfresh.netLimit.hh5": {
+      "key": "calfresh.netLimit.hh5",
+      "value": 3138,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "206b16537b0e6534"
+      }
+    },
+    "calfresh.grossLimit.hh6": {
+      "key": "calfresh.grossLimit.hh6",
+      "value": 7192,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "0bf74c7a20edc358"
+      }
+    },
+    "calfresh.netLimit.hh6": {
+      "key": "calfresh.netLimit.hh6",
+      "value": 3596,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "b5518d4f3fea8800"
+      }
+    },
+    "calfresh.grossLimit.hh7": {
+      "key": "calfresh.grossLimit.hh7",
+      "value": 8110,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "ec9b8e7a0da6fa1d"
+      }
+    },
+    "calfresh.netLimit.hh7": {
+      "key": "calfresh.netLimit.hh7",
+      "value": 4055,
+      "provenance": {
+        "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+        "as_of": "2026-07-10",
+        "fetched_at": "2026-07-11T08:11:21.706Z",
+        "checksum": "959d6171b513d014"
+      }
+    }
+  }
+}
