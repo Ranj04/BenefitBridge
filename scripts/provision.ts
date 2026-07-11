@@ -85,6 +85,10 @@ async function pickModels() {
   //    403 on agent create/update until their terms are accepted in the console.
   //    GLM-5.2 is the strongest agreement-free model on the account.
   const fallbacks = [
+    // GPT-4o mini: cheapest OpenAI model with DO-executable tool calling — the
+    // hard requirement for the screen_calfresh function route (verified 2026-07-11,
+    // after accepting OpenAI Policies in the console). Preferred first.
+    models.find((m) => /^OpenAI GPT-4o mini$/i.test(m.name) && isActive(m)),
     models.find((m) => /^OpenAI GPT-5\.2$/i.test(m.name) && isActive(m)),
     models.find((m) => /^OpenAI GPT-5$/i.test(m.name) && isActive(m)),
     models.find((m) => /^OpenAI GPT-4\.1$/i.test(m.name) && isActive(m)),
