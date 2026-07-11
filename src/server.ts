@@ -23,7 +23,7 @@ import { screenEitc } from './programs/eitc.ts';
 import { ensureDataContext, getFplBasis, toScreenContext } from './data/runtime.ts';
 
 export function buildServer(): FastifyInstance {
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: false, trustProxy: true });
 
   // Live-data layer (Prompt 3.5): re-sync FPL from the HHS ASPE API on demand.
   // TTL-cached in memory; falls back to the last-good versioned store, flagged
