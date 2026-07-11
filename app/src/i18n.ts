@@ -16,6 +16,15 @@ export function bcp47For(code: LangCode): string {
   return LANGUAGES.find((l) => l.code === code)?.bcp47 ?? 'en-US';
 }
 
+/**
+ * The stated-preference wording sent with the intake text. Language NAMES, not
+ * ISO codes — verified against the live intake agent: "zh" alone is ignored,
+ * "Chinese / 中文" extracts preferredLanguage: 'zh'.
+ */
+export function languageHint(code: LangCode): string {
+  return { en: 'English', es: 'Spanish / español', zh: 'Chinese / 中文' }[code];
+}
+
 /** Default to the browser locale when it is one of ours; otherwise English. */
 export function defaultLanguage(): LangCode {
   if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.language) {

@@ -11,7 +11,7 @@ import { FilerPanel } from './src/components/FilerPanel';
 import { LanguageSelector } from './src/components/LanguageSelector';
 import { useVoiceInput } from './src/hooks/useVoiceInput';
 import { useVoiceOutput } from './src/hooks/useVoiceOutput';
-import { STRINGS, bcp47For, defaultLanguage, type LangCode } from './src/i18n';
+import { STRINGS, bcp47For, defaultLanguage, languageHint, type LangCode } from './src/i18n';
 import offlineFixture from './fixtures/offline.json';
 
 // Three one-click demo personas (Prompt 5 task 5).
@@ -58,7 +58,7 @@ export default function App() {
     }
     setBusy(true);
     try {
-      setChat(await api.chat(input, lang));
+      setChat(await api.chat(input, languageHint(lang)));
     } catch (e) {
       setError((e as Error).message);
     } finally {

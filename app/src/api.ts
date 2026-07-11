@@ -22,9 +22,9 @@ export const api = {
   // intake agent extracts into HouseholdProfile.preferredLanguage) — a pure
   // frontend pass-through; /chat's contract ({ text }) is unchanged, no
   // backend edit. The agent already explains results in that language.
-  chat: (text: string, preferredLanguage?: string) =>
+  chat: (text: string, preferredLanguageHint?: string) =>
     post<ChatResponse>('/chat', {
-      text: preferredLanguage ? `${text}\n\n(My preferred language is "${preferredLanguage}".)` : text,
+      text: preferredLanguageHint ? `${text}\n\n(My preferred language is ${preferredLanguageHint}.)` : text,
     }),
   screen: (profile: NullableProfile) => post<ScreeningResult[]>('/screen', profile),
   fill: (profile: NullableProfile) => post<FilledApplication>('/fill', { profile, program: 'CalFresh' }),
