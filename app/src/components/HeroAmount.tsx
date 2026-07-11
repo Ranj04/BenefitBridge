@@ -38,12 +38,14 @@ export function HeroAmount({ totals, t }: { totals: HeroTotals; t: Strings }) {
 
   const monthly = totals.monthly > 0 ? fmtUsd(totals.monthly) : null;
   const annual = totals.annual > 0 ? fmtUsd(totals.annual) : null;
+  const oneTime = totals.oneTime > 0 ? fmtUsd(totals.oneTime) : null;
   const sentence = t.heroLine(monthly, annual);
+  const a11ySentence = oneTime ? `${sentence} ${t.plusOneTimeLine(oneTime)}` : sentence;
   const big = monthly ?? annual;
   const bigLabel = monthly ? t.perMonthLabel : t.perYearLabel;
 
   return (
-    <View accessibilityRole="header" accessibilityLabel={sentence}>
+    <View accessibilityRole="header" accessibilityLabel={a11ySentence}>
       {/* One card, two hearths: quiet pine above, lit gold below. */}
       <Animated.View
         style={[
@@ -82,6 +84,13 @@ export function HeroAmount({ totals, t }: { totals: HeroTotals; t: Strings }) {
                 {sentence}
               </Text>
             )}
+            {oneTime ? (
+              // One-time money is real money — shown as its own honest line,
+              // never silently folded into the monthly or annual figure.
+              <Text className="mt-3 text-center font-display text-h3 text-ink" importantForAccessibility="no">
+                {t.plusOneTimeLine(oneTime)}
+              </Text>
+            ) : null}
           </View>
         </Animated.View>
       </Animated.View>

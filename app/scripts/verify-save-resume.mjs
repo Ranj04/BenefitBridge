@@ -42,7 +42,20 @@ const result = (amount, reason) => ({
   applyUrl: 'https://www.getcalfresh.org/',
   disclaimer: 'Estimate only.',
 });
-const PROFILE = { householdSize: 2, monthlyIncomeDollars: 2800, immigrationStatus: 'lawful_permanent_resident', rentDollars: 1800 };
+// Real HouseholdProfile contract shape (src/contracts.ts): monthlyGrossIncome /
+// monthlyRent (not *Dollars), immigrationStatus enum 'citizen' | 'lpr' | 'other'.
+const PROFILE = {
+  householdSize: 2,
+  monthlyGrossIncome: 2800,
+  earnedIncome: 2800,
+  hasChildren: true,
+  hasElderlyOrDisabled: false,
+  isRenter: true,
+  monthlyRent: 1800,
+  countyFips: '06075',
+  immigrationStatus: 'lpr',
+  preferredLanguage: 'en',
+};
 const CHAT_FIXTURE = { profile: PROFILE, results: [result(300, 'Initial run')], explanation: 'You likely qualify.', guard: { rewritten: false, disclaimerAppended: true }, needMoreInfo: null, agentLayer: 'live' };
 const SCREEN_FIXTURE = [result(351, 'Fresh re-run after resume')]; // 351 ≠ 300 proves resume shows /screen's CURRENT answer
 
@@ -126,7 +139,7 @@ try {
     await page.waitForTimeout(1200);
     const withProfile = (await storageRaw(page)) ?? '';
     gate('B2 autosave now includes extracted profile', JSON.parse(withProfile).profile?.householdSize === 2);
-    gate('D  immigrationStatus never in web storage', !withProfile.includes('immigrationStatus') && !withProfile.includes('lawful_permanent_resident'));
+    gate('D  immigrationStatus never in web storage', !withProfile.includes('immigrationStatus') && !withProfile.includes('"lpr"'));
     gate('D2 saved results never persisted', !withProfile.includes('$300') && !JSON.parse(withProfile).results && !withProfile.includes('estimatedBenefit'));
 
     await page.reload();

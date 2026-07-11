@@ -53,8 +53,28 @@ describe('extractHouseholdSize', () => {
     expect(extractHouseholdSize('just me and my son')).toBe(2);
   });
 
+  it('reads the roster in whatever order it gets said', () => {
+    // The live bug: stated as "N kids and myself", asked for household size anyway.
+    expect(extractHouseholdSize('im a single dad i live with 3 kids and myself i make 5k a month')).toBe(4);
+    expect(extractHouseholdSize('3 kids and myself')).toBe(4);
+    expect(extractHouseholdSize('I live with my 2 kids')).toBe(3);
+    expect(extractHouseholdSize('single mom with two kids')).toBe(3);
+    expect(extractHouseholdSize('raising 3 kids on my own')).toBe(4);
+    expect(extractHouseholdSize('i live with my mom and my 2 kids')).toBe(4);
+  });
+
+  it('does not let a run-on sentence pull in people who are not in the household', () => {
+    // No period after the roster; the next clause must not be counted.
+    expect(extractHouseholdSize('i live with my 2 kids i need to call my mom about it')).toBe(3);
+  });
+
   it('stays null when the text says nothing about who lives there', () => {
     expect(extractHouseholdSize('I make 3k a month and need food help')).toBeNull();
+    expect(extractHouseholdSize('I need help with food')).toBeNull();
+  });
+
+  it('counts nobody for a negated roster', () => {
+    expect(extractHouseholdSize('no kids no husband, only me in th house')).toBe(1);
   });
 });
 
@@ -126,6 +146,25 @@ describe('POST /chat resilience (the live bug)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().needMoreInfo).toBeNull();
     expect(res.json().profile.monthlyGrossIncome).toBe(3000);
+  });
+
+  it('single dad who stated household and income is never re-asked for either', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      if (String(input).startsWith('https://intake.example')) throw new Error('agent 504');
+      throw new Error('unexpected fetch');
+    }));
+
+    const res = await buildServer().inject({
+      method: 'POST',
+      url: '/chat',
+      payload: { text: 'im a single dad i live with 3 kids and myself i make 5k a month and i live in section a housing' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.needMoreInfo).toBeNull(); // was: ['householdSize']
+    expect(body.profile.householdSize).toBe(4); // 3 kids + himself
+    expect(body.profile.monthlyGrossIncome).toBe(5000);
+    expect(body.profile.hasChildren).toBe(true);
   });
 
   it('text that truly says nothing → still asks, never invents', async () => {

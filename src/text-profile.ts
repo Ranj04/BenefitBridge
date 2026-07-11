@@ -83,7 +83,49 @@ export function extractMonthlyIncome(text: string): number | null {
   return null;
 }
 
-/** Household size. "only me in th house" → 1. "me and my 2 kids" → 3. */
+/** People a roster clause can name, besides the speaker. */
+const PERSON =
+  '(?:kids?|children|child|sons?|daughters?|baby|babies|toddlers?|newborns?|grand(?:kids?|children)' +
+  '|parents?|mom|mother|dad|father|husband|wife|spouse|partner|roommates?|siblings?|brothers?|sisters?' +
+  '|cousins?|dependents?)';
+
+/**
+ * People type run-on sentences: "i live with 3 kids and myself i make 5k a month".
+ * The roster ends where the next statement begins, not at a period they never typed.
+ */
+function clauseFrom(rest: string): string {
+  const stop = rest.search(
+    /[.!?\n;]|\b(?:i|we)\s+(?:make|makes|earn|earns|get|gets|am|need|needs|want|wants|work|works|live|lives|rent|rents|pay|pays|have|has)\b/i,
+  );
+  return stop === -1 ? rest : rest.slice(0, stop);
+}
+
+/**
+ * Sum the people a clause names, plus the speaker when they are one of them.
+ * "3 kids and myself" → 4. "my 2 kids" (speaker implied by "I live with") → 3.
+ * A negated term ("no kids") contributes nobody. Nothing named → null.
+ */
+function countRoster(clause: string, speakerLivesThere: boolean): number | null {
+  const re = new RegExp(`(?:(?:my|our|the)\\s+)?(?:(no|${COUNT})\\s+)?(?:(?:my|our|the)\\s+)?${PERSON}\\b`, 'gi');
+  let total = 0;
+  let named = false;
+
+  for (const m of clause.matchAll(re)) {
+    const qty = m[1]?.toLowerCase();
+    if (qty === 'no') continue; // "no kids" names nobody
+    const n = qty ? countFrom(qty) : 1;
+    if (n == null || n < 0 || n > 19) return null;
+    total += n;
+    named = true;
+  }
+
+  const speaker = speakerLivesThere || /\b(?:me|myself|i)\b/i.test(clause);
+  if (!named && !speaker) return null;
+  total += speaker ? 1 : 0;
+  return total >= 1 && total <= 20 ? total : null;
+}
+
+/** Household size. "only me in th house" → 1. "i live with 3 kids and myself" → 4. */
 export function extractHouseholdSize(text: string): number | null {
   const t = text.toLowerCase();
 
@@ -97,11 +139,23 @@ export function extractHouseholdSize(text: string): number | null {
     if (n != null && n >= 1 && n <= 20) return n;
   }
 
-  // "me and my 3 kids", "just me and my son"
-  const withKids = t.match(new RegExp(`\\b(?:me|myself|i)\\s+and\\s+(?:my\\s+)?${COUNT}?\\s*(kids?|children|child|sons?|daughters?)\\b`, 'i'));
-  if (withKids) {
-    const n = withKids[1] ? countFrom(withKids[1]!) : 1;
-    if (n != null && n >= 1 && n <= 19) return n + 1;
+  // A roster of who lives there, in whatever order it gets said.
+  // "i live with 3 kids and myself" / "single dad with 3 kids" / "raising 2 kids"
+  const lives = t.match(
+    /\b(?:(?:live|living|lives|stay|staying)\s+with|raising|supporting)\s+([^]*)/i,
+  ) ?? t.match(/\b(?:single\s+(?:dad|mom|mum|mother|father|parent)|widow(?:er)?)\b[^.!?\n]{0,30}?\bwith\s+([^]*)/i);
+  if (lives) {
+    const n = countRoster(clauseFrom(lives[1]!), true);
+    if (n != null) return n;
+  }
+
+  // "me and my 2 kids", "just me and my son", and the reverse: "3 kids and myself".
+  const roster =
+    t.match(/\b(?:me|myself)\s+and\s+([^]*)/i) ??
+    t.match(new RegExp(`\\b(${COUNT}\\s+(?:my\\s+)?${PERSON}\\b[^.!?\\n]{0,15}?and\\s+(?:me|myself))`, 'i'));
+  if (roster) {
+    const n = countRoster(`me and ${clauseFrom(roster[1]!)}`, false);
+    if (n != null && n >= 2) return n;
   }
 
   // Living alone, however it gets phrased.

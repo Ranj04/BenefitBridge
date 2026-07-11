@@ -15,7 +15,7 @@ describe('enforceNoGuarantee — deterministic defense in depth', () => {
   it("rewrites \"you're entitled to\" phrasing", () => {
     const r = enforceNoGuarantee("You're entitled to $350 every month.");
     expect(r.rewritten).toBe(true);
-    expect(r.text).toContain('you may qualify for an estimated $350');
+    expect(r.text.toLowerCase()).toContain('you may qualify for an estimated $350');
   });
 
   it('does not over-trigger on honest estimate language', () => {

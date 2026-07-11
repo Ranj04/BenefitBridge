@@ -18,8 +18,14 @@ export function useReducedMotion(): boolean {
       if (typeof window === 'undefined' || !('matchMedia' in window)) return;
       const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
       const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
-      mq.addEventListener('change', onChange);
-      return () => mq.removeEventListener('change', onChange);
+      // Older WebKit (Safari < 14) has no add/removeEventListener on
+      // MediaQueryList — feature-detect and fall back to the legacy API.
+      if (typeof mq.addEventListener === 'function') {
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+      }
+      mq.addListener(onChange);
+      return () => mq.removeListener(onChange);
     }
     let mounted = true;
     void AccessibilityInfo.isReduceMotionEnabled().then((v) => mounted && setReduced(v));
