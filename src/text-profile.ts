@@ -83,11 +83,92 @@ export function extractMonthlyIncome(text: string): number | null {
   return null;
 }
 
-/** People a roster clause can name, besides the speaker. */
+/** Non-capturing count, for patterns that scan rather than pull a single group. */
+const COUNT_NC = '(?:\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)';
+
+/** Everyone a household roster can name, besides the speaker. */
 const PERSON =
-  '(?:kids?|children|child|sons?|daughters?|baby|babies|toddlers?|newborns?|grand(?:kids?|children)' +
-  '|parents?|mom|mother|dad|father|husband|wife|spouse|partner|roommates?|siblings?|brothers?|sisters?' +
-  '|cousins?|dependents?)';
+  '(?:kids?|children|child|sons?|daughters?|babies|baby|toddlers?|newborns?|infants?|teens?|teenagers?' +
+  '|grand(?:kids?|children|child|parents?|ma|mother|pa|father)|parents?|moms?|mothers?|mums?|dads?|fathers?' +
+  '|husbands?|wives|wife|spouses?|partners?|girlfriends?|boyfriends?|fiancees?|fiances?' +
+  '|roommates?|housemates?|siblings?|brothers?|sisters?|cousins?|nieces?|nephews?|aunts?|uncles?' +
+  '|stepkids?|stepsons?|stepdaughters?|dependents?|adults?|grownups?|relatives?)';
+
+const SELF = '(?:me|myself|i)';
+const SELF_SET = new Set(['me', 'myself', 'i']);
+
+/** Plural nouns that denote a specific number of people by ordinary meaning. */
+const PAIR: Record<string, number> = { parents: 2, grandparents: 2 };
+
+/** "kids" / "children" / "wives" — a count we were not given. */
+function isPlural(token: string): boolean {
+  return /(?:s|children|wives)$/.test(token);
+}
+
+/** One roster entry: an optional count, an optional determiner, and a person. */
+const ITEM = `\\b(?:(?:my|our|the)\\s+)?(?:(no|${COUNT_NC})\\s+)?(?:(?:my|our|the)\\s+)?(${PERSON}|${SELF})\\b`;
+const ITEM_NC = ITEM.replace(/\((?!\?)/g, '(?:');
+/** Roster entries run together with commas, "and", or nothing at all ("me my mom and my 2 brothers"). */
+const SEP = '\\s*(?:,\\s*and|,|;|&|\\+|and|plus)?\\s*';
+
+type Scan = { total: number; named: boolean; self: boolean; ambiguous: boolean; allCounted: boolean };
+
+/**
+ * Read the people a clause names. The speaker is tallied separately, so a text
+ * that names them twice ("i live with 3 kids and myself") still counts them once.
+ *
+ * A plural with no number ("my kids", "roommates") is a count we were NOT given.
+ * We do not settle it at 1 — we mark it ambiguous and let the caller ask, because
+ * inventing a household size is inventing a benefit amount.
+ */
+function scanPeople(clause: string): Scan {
+  const scan: Scan = { total: 0, named: false, self: false, ambiguous: false, allCounted: true };
+
+  for (const m of clause.matchAll(new RegExp(ITEM, 'gi'))) {
+    const qty = m[1]?.toLowerCase();
+    const token = m[2]!.toLowerCase();
+
+    if (SELF_SET.has(token)) {
+      scan.self = true;
+      continue;
+    }
+    if (qty === 'no') continue; // "no kids", "no husband" → nobody
+
+    if (qty) {
+      const n = countFrom(qty);
+      if (n == null || n < 0 || n > 19) {
+        scan.ambiguous = true;
+        continue;
+      }
+      scan.total += n;
+      scan.named = true;
+      continue;
+    }
+    if (PAIR[token] != null) {
+      scan.total += PAIR[token]!;
+      scan.named = true;
+      scan.allCounted = false;
+      continue;
+    }
+    if (isPlural(token)) {
+      scan.ambiguous = true; // "my kids" — how many? Never assume.
+      scan.allCounted = false;
+      continue;
+    }
+    scan.total += 1; // a singular person: "my wife", "my son"
+    scan.named = true;
+    scan.allCounted = false;
+  }
+  return scan;
+}
+
+/** Turn a scan into a household total, counting the speaker at most once. */
+function totalFrom(scan: Scan, speakerImplied: boolean): number | null {
+  if (scan.ambiguous) return null; // an unstated count is a question, not a guess
+  if (!scan.named) return null;
+  const total = scan.total + (speakerImplied || scan.self ? 1 : 0);
+  return total >= 1 && total <= 20 ? total : null;
+}
 
 /**
  * People type run-on sentences: "i live with 3 kids and myself i make 5k a month".
@@ -95,70 +176,61 @@ const PERSON =
  */
 function clauseFrom(rest: string): string {
   const stop = rest.search(
-    /[.!?\n;]|\b(?:i|we)\s+(?:make|makes|earn|earns|get|gets|am|need|needs|want|wants|work|works|live|lives|rent|rents|pay|pays|have|has)\b/i,
+    /[.!?\n;]|\b(?:i|we)\s+(?:make|makes|earn|earns|get|gets|am|need|needs|want|wants|work|works|live|lives|rent|rents|pay|pays|have|has|call|called)\b/i,
   );
   return stop === -1 ? rest : rest.slice(0, stop);
-}
-
-/**
- * Sum the people a clause names, plus the speaker when they are one of them.
- * "3 kids and myself" → 4. "my 2 kids" (speaker implied by "I live with") → 3.
- * A negated term ("no kids") contributes nobody. Nothing named → null.
- */
-function countRoster(clause: string, speakerLivesThere: boolean): number | null {
-  const re = new RegExp(`(?:(?:my|our|the)\\s+)?(?:(no|${COUNT})\\s+)?(?:(?:my|our|the)\\s+)?${PERSON}\\b`, 'gi');
-  let total = 0;
-  let named = false;
-
-  for (const m of clause.matchAll(re)) {
-    const qty = m[1]?.toLowerCase();
-    if (qty === 'no') continue; // "no kids" names nobody
-    const n = qty ? countFrom(qty) : 1;
-    if (n == null || n < 0 || n > 19) return null;
-    total += n;
-    named = true;
-  }
-
-  const speaker = speakerLivesThere || /\b(?:me|myself|i)\b/i.test(clause);
-  if (!named && !speaker) return null;
-  total += speaker ? 1 : 0;
-  return total >= 1 && total <= 20 ? total : null;
 }
 
 /** Household size. "only me in th house" → 1. "i live with 3 kids and myself" → 4. */
 export function extractHouseholdSize(text: string): number | null {
   const t = text.toLowerCase();
 
-  // Explicit counts win over inference.
+  // 1. An explicit total wins over any inference.
   const explicit =
+    t.match(new RegExp(`\\b(?:household|family)\\s+(?:size\\s+)?(?:is\\s+|of\\s+|:\\s*)${COUNT}\\b`, 'i')) ??
     t.match(new RegExp(`\\b(?:household|family|home|house)\\s+of\\s+${COUNT}\\b`, 'i')) ??
-    t.match(new RegExp(`\\b${COUNT}\\s+(?:people|persons?|of us|in (?:my|the|th) (?:house|home|household|apartment))\\b`, 'i')) ??
+    t.match(new RegExp(`\\b${COUNT}\\s+(?:people|persons?|of us|total|in\\s+(?:my|the|th)\\s+(?:house|home|household|apartment|place))\\b`, 'i')) ??
     t.match(new RegExp(`\\bwe(?:'re| are)\\s+${COUNT}\\b`, 'i'));
   if (explicit) {
     const n = countFrom(explicit[1]!);
     if (n != null && n >= 1 && n <= 20) return n;
   }
 
-  // A roster of who lives there, in whatever order it gets said.
-  // "i live with 3 kids and myself" / "single dad with 3 kids" / "raising 2 kids"
-  const lives = t.match(
-    /\b(?:(?:live|living|lives|stay|staying)\s+with|raising|supporting)\s+([^]*)/i,
-  ) ?? t.match(/\b(?:single\s+(?:dad|mom|mum|mother|father|parent)|widow(?:er)?)\b[^.!?\n]{0,30}?\bwith\s+([^]*)/i);
-  if (lives) {
-    const n = countRoster(clauseFrom(lives[1]!), true);
+  // 2. "single mother of 3", "dad of two" — the parent is in the household too.
+  const parentOf = t.match(
+    new RegExp(`\\b(?:single\\s+)?(?:mom|mother|mum|dad|father|parent)\\s+(?:of|to)\\s+${COUNT}\\b`, 'i'),
+  );
+  if (parentOf) {
+    const n = countFrom(parentOf[1]!);
+    if (n != null && n >= 1 && n <= 19) return n + 1;
+  }
+
+  // 3. A roster introduced by who they live with / support / have.
+  //    "i live with 3 kids and myself", "raising 2 kids", "i have 3 kids", "single dad with 2 kids"
+  const anchored =
+    t.match(/\b(?:(?:live|living|lives|stay|staying|reside|residing)\s+(?:with|w\/)|raising|supporting|caring\s+for|looking\s+after|taking\s+care\s+of)\s+([^]*)/i) ??
+    t.match(/\b(?:i\s+have|i've\s+got|ive\s+got|i\s+got|we\s+have|there(?:'s| is| are)|it'?s)\s+([^]*)/i) ??
+    t.match(/\b(?:single\s+(?:dad|mom|mum|mother|father|parent)|widow(?:er)?)\b[^.!?\n]{0,30}?\bwith\s+([^]*)/i);
+  if (anchored) {
+    const scan = scanPeople(clauseFrom(anchored[1]!));
+    if (scan.ambiguous) return null; // they named people but not how many
+    const n = totalFrom(scan, true);
     if (n != null) return n;
   }
 
-  // "me and my 2 kids", "just me and my son", and the reverse: "3 kids and myself".
-  const roster =
-    t.match(/\b(?:me|myself)\s+and\s+([^]*)/i) ??
-    t.match(new RegExp(`\\b(${COUNT}\\s+(?:my\\s+)?${PERSON}\\b[^.!?\\n]{0,15}?and\\s+(?:me|myself))`, 'i'));
-  if (roster) {
-    const n = countRoster(`me and ${clauseFrom(roster[1]!)}`, false);
-    if (n != null && n >= 2) return n;
+  // 4. A bare roster: a coordinated list of people, with or without the speaker in it.
+  //    "me, my wife, and our three kids" / "my husband and me" / "2 adults and 3 children"
+  const list = t.match(new RegExp(`${ITEM_NC}(?:${SEP}${ITEM_NC})+`, 'i'));
+  if (list) {
+    const scan = scanPeople(list[0]);
+    if (scan.ambiguous) return null;
+    if (scan.named && (scan.self || scan.allCounted)) {
+      const n = totalFrom(scan, false);
+      if (n != null && n >= 2) return n;
+    }
   }
 
-  // Living alone, however it gets phrased.
+  // 5. Living alone, however it gets phrased.
   if (/\b(?:live|living|lives|stay|staying)\s+(?:by\s+myself|alone)\b/.test(t)) return 1;
   if (/\b(?:only|just)\s+me\b/.test(t)) return 1;
   if (/\bby\s+myself\b/.test(t)) return 1;

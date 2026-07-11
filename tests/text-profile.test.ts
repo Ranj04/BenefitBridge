@@ -68,9 +68,44 @@ describe('extractHouseholdSize', () => {
     expect(extractHouseholdSize('i live with my 2 kids i need to call my mom about it')).toBe(3);
   });
 
+  it('reads "parent of N" — the parent is in the household too', () => {
+    expect(extractHouseholdSize('single mother of 3')).toBe(4);
+    expect(extractHouseholdSize('single dad of two')).toBe(3);
+    expect(extractHouseholdSize('im a mother of 4')).toBe(5);
+  });
+
+  it('reads "I have N kids"', () => {
+    expect(extractHouseholdSize('i have 3 kids')).toBe(4);
+    expect(extractHouseholdSize('ive got 4 kids')).toBe(5);
+    expect(extractHouseholdSize('i have two children and no husband')).toBe(3); // "no husband" counts nobody
+  });
+
+  it('reads a coordinated roster in any order, with or without commas', () => {
+    expect(extractHouseholdSize('me, my wife, and our three kids')).toBe(5);
+    expect(extractHouseholdSize('its me my mom and my 2 brothers')).toBe(4);
+    expect(extractHouseholdSize('my husband and me')).toBe(2);
+    expect(extractHouseholdSize('my wife and i and our 2 kids')).toBe(4);
+    expect(extractHouseholdSize('2 adults and 3 children')).toBe(5);
+  });
+
+  it('counts the speaker once, however many times they name themselves', () => {
+    expect(extractHouseholdSize('i live with 3 kids and myself')).toBe(4); // not 5
+  });
+
+  it('never invents a count it was not given', () => {
+    // A plural with no number is a question, not a 1. Inventing a household
+    // size invents a benefit amount.
+    expect(extractHouseholdSize('i live with my kids')).toBeNull();
+    expect(extractHouseholdSize('me and my children')).toBeNull();
+    expect(extractHouseholdSize('i live with roommates')).toBeNull();
+  });
+
   it('stays null when the text says nothing about who lives there', () => {
     expect(extractHouseholdSize('I make 3k a month and need food help')).toBeNull();
     expect(extractHouseholdSize('I need help with food')).toBeNull();
+    expect(extractHouseholdSize('can you help me get groceries')).toBeNull(); // "me" is not a household
+    expect(extractHouseholdSize('i have 2 jobs')).toBeNull(); // a count, but not of people
+    expect(extractHouseholdSize('i need to call my mom about it')).toBeNull(); // a person, but not a roster
   });
 
   it('counts nobody for a negated roster', () => {
