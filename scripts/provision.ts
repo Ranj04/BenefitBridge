@@ -224,14 +224,20 @@ async function main() {
     console.warn(`  [warn] route add failed (may already exist): ${e.message}`);
   }
 
-  // Capture the router's deployment endpoint + a fresh API key for invocation.
-  const router: any = await client.agents.retrieve(state.routerAgentUuid);
-  state.routerEndpoint = router?.agent?.deployment?.url ?? router?.deployment?.url ?? '';
-  try {
-    const key: any = await client.agents.apiKeys.create(state.routerAgentUuid, { name: 'bb-router-key' } as any);
-    state.routerAgentKey = key?.api_key_info?.secret_key ?? key?.secret_key ?? '';
-  } catch (e: any) {
-    console.warn(`  [warn] could not mint router API key via SDK: ${e.message}. Create one in the console: Agents → ${RESOURCE_NAMES.routerAgent} → Endpoint → API Keys.`);
+  // Capture intake + router deployment endpoints and API keys for verify scripts.
+  for (const [label, uuidKey, endpointKey, secretKey, keyDisplayName] of [
+    ['intake', 'intakeAgentUuid', 'intakeEndpoint', 'intakeAgentKey', 'bb-intake-key'],
+    ['router', 'routerAgentUuid', 'routerEndpoint', 'routerAgentKey', 'bb-router-key'],
+  ] as const) {
+    const uuid = state[uuidKey];
+    const agent: any = await client.agents.retrieve(uuid);
+    state[endpointKey] = agent?.agent?.deployment?.url ?? agent?.deployment?.url ?? '';
+    try {
+      const key: any = await client.agents.apiKeys.create(uuid, { name: keyDisplayName } as any);
+      state[secretKey] = key?.api_key_info?.secret_key ?? key?.secret_key ?? '';
+    } catch (e: any) {
+      console.warn(`  [warn] could not mint ${label} API key: ${e.message}`);
+    }
   }
 
   writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
