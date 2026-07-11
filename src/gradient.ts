@@ -14,10 +14,10 @@ export function makeClient(): Gradient {
  * via the OpenAI-compatible chat.completions surface (how the frontend calls the router).
  */
 export function makeAgentClient(agentEndpoint: string, agentAccessKey: string): Gradient {
+  const base = agentEndpoint.replace(/\/$/, '');
   return new Gradient({
-    accessToken: requireEnv('DO_API_TOKEN'),
-    agentEndpoint,
     agentAccessKey,
+    baseURL: `${base}/api/v1`,
   });
 }
 
