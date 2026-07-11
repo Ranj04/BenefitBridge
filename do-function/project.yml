@@ -1,0 +1,24 @@
+# DigitalOcean Functions project — the FaaS proxy that backs the Gradient function route.
+# Gradient function routes call a DigitalOcean Function (not a raw URL), so this thin
+# function forwards the HouseholdProfile to Person B's SCREEN_URL and returns ScreeningResult[].
+#
+# Deploy:
+#   doctl serverless connect
+#   doctl serverless deploy do-function --env do-function/.env
+# Then read the namespace + function name into provision:
+#   FAAS_NAMESPACE=<fn-xxxx>  FAAS_NAME=benefits/screen  npm run provision
+parameters: {}
+packages:
+  - name: benefits
+    environment:
+      SCREEN_URL: ${SCREEN_URL}
+    functions:
+      - name: screen
+        binary: false
+        main: ''
+        runtime: 'nodejs:18'
+        web: false
+        parameters: {}
+        limits:
+          timeout: 15000
+          memory: 256
