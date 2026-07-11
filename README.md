@@ -98,25 +98,60 @@ type ScreeningResult = {
 };
 ```
 
-The `period` field exists because CalFresh is monthly and EITC is an annual lump sum; the UI must never label a one-time tax credit as recurring income. Full contracts (including `HouseholdProfile` and `FilledApplication`) live in the planning docs and will land in `src/contracts.ts`.
+The `period` field exists because CalFresh is monthly and EITC is an annual lump sum; the UI must never label a one-time tax credit as recurring income. Full contracts live in `src/contracts.ts`.
 
-## Repo status and layout
+## What's live right now
 
-This repo is currently in the planning stage: it holds the build plan and the Claude Code session prompts that drive each phase. Code lands phase by phase on feature branches.
-
-| File | What it is |
+| Surface | URL |
 |---|---|
-| `benefits-navigator-plan.md` | The master build plan: product vision, architecture, track strategy, risk register, demo script |
-| `benefitbridge-claude-code-full-sequence.md` | The full nine-prompt build sequence with standing rules and run order |
-| `benefitbridge-claude-code-phase0-1.md` | Prompt 1 — the backend spine: CalFresh cascade + `/screen` endpoint |
-| `benefitbridge-claude-code-prompt2-personA.md` | Prompt 2 — the Gradient agent graph, knowledge bases, and guardrails |
-| `benefitbridge-claude-code-prompt3.5-live-data.md` | Prompt 3.5 — live FPL data layer from HHS ASPE API |
+| Web app (chat → cards → Verification Console → filer) | https://benefitbridge-screen-eh945.ondigitalocean.app/app/ |
+| Benefits-gap map (Best Use of Data) | https://benefitbridge-screen-eh945.ondigitalocean.app/app/gap-map.html |
+| Engine API — `POST /screen`, `/fill`, `/chat`, `/sync`, `/adversarial-test` | https://benefitbridge-screen-eh945.ondigitalocean.app |
 
-### Build sequence
+The demo persona ("single mom in SF, about $2,800 a month, one kid, renting for $1,800") returns CalFresh **$159/month** with the full 12-line cascade, a four-figure federal EITC labeled *annual*, Medi-Cal via the children's 266% tier, CARE, and LifeLine via the categorical path — every figure computed in code, cited, and disclaimed. The screening-accuracy harness holds **17/17 hand-labeled outcomes (100%)** across 12 personas; multilingual intake is verified end-to-end in English, Spanish, and Chinese.
 
-Two people, split by surface. Person B owns the deterministic spine and frontend; Person A owns the Gradient AI layer. The golden path that must ship: backend spine → agent graph → program breadth → application filer → frontend. The trust layer (multilingual intake in English, Spanish, and Chinese; eval harness; offline demo fixture; traces), the benefits-gap map, and the accessibility pass follow as depth.
+## DigitalOcean products used
 
-Every phase ends at an adversarial verify gate: boundary values at each FPL threshold, over-threshold profiles that must return an honest `unlikely`, elderly/disabled paths, missing inputs that must not silently become zeros, and a grep for floats on money paths. A gate that only proves the happy path counts as failed.
+| Product | How |
+|---|---|
+| **Gradient AI — Agents** | Intake (free text → strict `HouseholdProfile` JSON), Router, Food/CalFresh domain agent |
+| **Gradient AI — Knowledge Base** | Official CalFresh sources (sfhsa.org, cdss.ca.gov) crawled and attached for cited RAG |
+| **Gradient AI — Guardrails** | Jailbreak + sensitive-data presets on the agents, *plus* a deterministic code-level guarantee→estimate rewrite (defense in depth) |
+| **Gradient AI — Function routing** | `screen_calfresh` route on the Food agent → DO Functions proxy → the engine |
+| **DO Functions** | The FaaS proxy backing the function route (namespace `fn-2b5e6189…`, tor1) |
+| **App Platform** | One app, two components: the Fastify engine service and the Expo web static site |
+
+## Run it
+
+```bash
+npm ci                      # root: engine + data layer + filer
+npx vitest run              # 91 tests, incl. the labeled-accuracy harness
+npm start                   # engine on :8080 (POST /screen, /fill, /chat…)
+
+python3 scripts/extract-cf256.py     # refresh CDSS CalFresh enrollment extract
+npx tsx scripts/build-gap-map.ts     # rebuild the benefits-gap map from live data
+npx tsx src/data/sync.ts 2026        # live FPL sync from the HHS ASPE API
+
+cd app && npm ci && npx expo start   # the universal app (web + iOS)
+```
+
+Agent-layer env (server-side only, never in the browser): `AGENT_INTAKE_URL/KEY`, `AGENT_FOOD_URL/KEY` — see `CANONICAL.md` for the canonical resource identifiers.
+
+## Repo layout
+
+| Path | What it is |
+|---|---|
+| `src/programs/` | Deterministic screens: CalFresh cascade, Medi-Cal, CARE, LifeLine, EITC/CalEITC — bigint cents, verified constants with `source_url` + `as_of` |
+| `src/data/` | Live FPL layer: HHS ASPE API sync, versioned provenance-stamped store, drift cross-check |
+| `src/filer/` | CF 285 (8/21) field mapping + pdf-lib fill; the consent boundary |
+| `src/server.ts`, `src/chat.ts` | Fastify engine + the agent-chain orchestration |
+| `app/` | Expo SDK 54 + NativeWind universal app; `app/public/gap-map.html` |
+| `scripts/` | Gradient provisioning/verification (Person A), gap-map build, CF256 extract |
+| `tests/` | 91 adversarial tests: boundaries, rounding, float-drift, filer boundary, labeled accuracy |
+| `CANONICAL.md` | Single source of truth for live resource identifiers |
+| `benefits-navigator-plan.md`, `benefitbridge-claude-code-*.md` | The master plan and the phase prompts that built all of this |
+
+Every phase ended at an adversarial verify gate: boundary values at each FPL threshold, over-threshold profiles that must return an honest `unlikely`, elderly/disabled paths, missing inputs that must never silently become zeros, and a grep for floats on money paths. A gate that only proves the happy path counts as failed.
 
 ## Who this is for
 
