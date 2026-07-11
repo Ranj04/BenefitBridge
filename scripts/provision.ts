@@ -37,25 +37,74 @@ async function findKbByName(name: string): Promise<any | undefined> {
   return (res?.knowledge_bases ?? []).find((k: any) => k.name === name);
 }
 
-/** Pick a Claude foundation model UUID and an embedding model UUID from the account. */
+/** Pick a foundation model + embedding model. Prefers active Claude; skips end-of-life models. */
 async function pickModels() {
   const res: any = await client.models.list();
   const models: any[] = res?.models ?? [];
-  const claudeCandidates = models.filter((m) => /claude/i.test(m.name) && m.is_foundational !== false);
+  const isActive = (m: any) => m.lifecycle_status !== 'end_of_life';
+  const claudeCandidates = models.filter((m) => /claude/i.test(m.name) && m.is_foundational !== false && isActive(m));
   const claude =
-    claudeCandidates.find((m) => /sonnet 4(?!\.)/i.test(m.name)) ??
-    claudeCandidates.find((m) => /sonnet 3\.5/i.test(m.name)) ??
-    claudeCandidates.find((m) => /haiku/i.test(m.name)) ??
+    claudeCandidates.find((m) => /sonnet 4\.6|4\.5 sonnet/i.test(m.name)) ??
+    claudeCandidates.find((m) => /sonnet 5|haiku 4\.5/i.test(m.name)) ??
     claudeCandidates[0];
+  const fallbacks = [
+    models.find((m) => /^MiMo V2\.5$/i.test(m.name) && isActive(m)),
+    models.find((m) => /llama 3\.3 instruct \(70B\)/i.test(m.name) && isActive(m)),
+    models.find((m) => /mistral nemo instruct/i.test(m.name) && isActive(m)),
+  ].filter(Boolean) as any[];
   const embedCandidates = models.filter(
     (m) => /embed/i.test(m.name) || (m.usecases ?? []).some((u: string) => /embed/i.test(u)),
   );
   const embed =
     embedCandidates.find((m) => /gte large|e5 large|bge m3|multi qa mpnet/i.test(m.name)) ??
     embedCandidates[0];
-  if (!claude) throw new Error('No Claude foundation model found on this account — enable one in Gradient, or edit pickModels().');
+
+  /** Probe agent-create once so we don't fail mid-provision on Anthropic terms (403). */
+  async function canCreate(modelUuid: string): Promise<boolean> {
+    try {
+      const created: any = await client.agents.create({
+        name: `bb-model-probe-${Date.now()}`,
+        instruction: 'probe',
+        model_uuid: modelUuid,
+        region: config.region,
+        project_id: (await resolveProjectId())!,
+      });
+      const uuid = pickUuid(created);
+      if (uuid) await client.agents.delete(uuid).catch(() => undefined);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  let modelUuid: string;
+  let modelName: string;
+  if (claude && (await canCreate(claude.uuid))) {
+    modelUuid = claude.uuid;
+    modelName = claude.name;
+  } else {
+    let picked: any;
+    for (const fb of fallbacks) {
+      if (await canCreate(fb.uuid)) {
+        picked = fb;
+        break;
+      }
+    }
+    if (!picked) {
+      throw new Error(
+        'No agent-compatible model found. In the DO console accept Anthropic model terms, or enable serverless inference.',
+      );
+    }
+    modelUuid = picked.uuid;
+    modelName = picked.name;
+    console.warn(
+      `[warn] Claude agents blocked (accept Anthropic terms: Gradient AI Platform → Models → Anthropic Claude → Accept). Using ${picked.name} for now.`,
+    );
+  }
+
   if (!embed) console.warn('[warn] No embedding model auto-detected; KB may need embedding_model_uuid set manually.');
-  return { modelUuid: claude.uuid as string, embedUuid: embed?.uuid as string | undefined };
+  console.log(`Selected agent model: ${modelName}`);
+  return { modelUuid, embedUuid: embed?.uuid as string | undefined };
 }
 
 async function ensureAgent(
@@ -63,7 +112,6 @@ async function ensureAgent(
   instruction: string,
   modelUuid: string,
   projectId: string,
-  kbUuids: string[] = [],
 ) {
   const existing = await findAgentByName(name);
   if (existing) {
@@ -77,7 +125,6 @@ async function ensureAgent(
     model_uuid: modelUuid,
     region: config.region,
     project_id: projectId,
-    knowledge_base_uuid: kbUuids.length ? kbUuids : undefined,
   });
   const uuid = pickUuid(created)!;
   console.log(`+ created agent "${name}" [${uuid}]`);
@@ -127,8 +174,16 @@ async function main() {
   // --- A1.1 Intake agent ---
   state.intakeAgentUuid = await ensureAgent(RESOURCE_NAMES.intakeAgent, INTAKE_INSTRUCTION, modelUuid, projectId);
 
-  // --- A1.3 Food domain agent (KB attached) ---
-  state.foodAgentUuid = await ensureAgent(RESOURCE_NAMES.foodAgent, FOOD_INSTRUCTION, modelUuid, projectId, [kb.uuid]);
+  // --- A1.3 Food domain agent (KB attached after create — KB DB may still be provisioning) ---
+  state.foodAgentUuid = await ensureAgent(RESOURCE_NAMES.foodAgent, FOOD_INSTRUCTION, modelUuid, projectId);
+  try {
+    await client.agents.knowledgeBases.attachSingle(kb.uuid, { agent_uuid: state.foodAgentUuid });
+    console.log('+ attached food KB to Food agent');
+  } catch (e: any) {
+    console.warn(
+      `  [warn] could not attach KB yet (${e.message}); attach in console once indexing is ready: Agents → ${RESOURCE_NAMES.foodAgent} → Knowledge Bases.`,
+    );
+  }
 
   // --- A1.4 Function route: register /screen (via FaaS proxy) on the Food agent ---
   const faasNamespace = process.env.FAAS_NAMESPACE?.trim();
