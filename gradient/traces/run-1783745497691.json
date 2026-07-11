@@ -1,0 +1,69 @@
+{
+  "input": "single mom in SF, about $2,800 a month, one kid, renting",
+  "screen_url": "http://localhost:8787/screen",
+  "profile": {
+    "householdSize": 2,
+    "monthlyGrossIncome": 2800,
+    "earnedIncome": null,
+    "hasChildren": true,
+    "childrenAges": null,
+    "hasElderlyOrDisabled": null,
+    "isRenter": true,
+    "monthlyRent": null,
+    "monthlyUtilities": null,
+    "dependentCareCost": null,
+    "medicalExpenses": null,
+    "countyFips": "06075",
+    "immigrationStatus": null,
+    "preferredLanguage": "en"
+  },
+  "router_reply": "Thanks for sharing a bit about your situation. \n\nRight now, BenefitBridge can help with **food assistance** — like CalFresh/EBT — which may be able to help with groceries for you and your child.\n\n**Coming soon**, we'll also be screening for:\n- Health coverage\n- Utility discounts\n- Cash aid\n- Tax credits\n\nIf you'd like, tell me a bit about what you're hoping to get help with — especially any food or grocery needs — and I can get you started with a food assistance screening.",
+  "coercion_assumptions": [
+    "assumed all income is earned (wages) — confirm",
+    "assumed no elderly/disabled member (not stated)"
+  ],
+  "screening": [
+    {
+      "program": "CalFresh",
+      "screening": "likely_qualify",
+      "estimatedBenefit": {
+        "amount": 350,
+        "period": "monthly"
+      },
+      "computation": [
+        {
+          "label": "[MOCK] Gross monthly income",
+          "value": 2800
+        },
+        {
+          "label": "[MOCK] Gross limit, household of 2",
+          "value": 3526
+        },
+        {
+          "label": "[MOCK] Estimated monthly benefit",
+          "value": 350
+        }
+      ],
+      "assumptions": [
+        "[MOCK] Canned response from the local mock — no real cascade was computed.",
+        "[MOCK] Replace with the live /screen (Person B) before any demo."
+      ],
+      "reason": "[MOCK] Canned CalFresh result for graph development. Real screening comes from the deterministic engine at SCREEN_URL.",
+      "citations": [
+        {
+          "text": "CalFresh income limits (FY2026), California Department of Social Services",
+          "source_url": "https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements",
+          "as_of": "2026-07-10"
+        }
+      ],
+      "applyUrl": "https://www.getcalfresh.org/",
+      "disclaimer": "Estimate, not a determination. Confirm with SF HSA. (MOCK response — for development only.)"
+    }
+  ],
+  "food_raw": "Thanks for sharing your information with us! Here's what we found.\n\n**You may qualify for CalFresh.**\n\nBased on what you told us, your household appears to meet the income guidelines for CalFresh. For a household of 2, the gross monthly income limit is $3,526, and it looks like your income is within that limit.\n\n**Your estimated monthly benefit is $350 per month.**\n\nJust remember — this is only an estimate. Your actual benefit amount could be different depending on factors like your income, expenses (such as rent and utilities), and household size.\n\n### Ready to take the next step?\n\nYou can start your CalFresh application online here:\n**https://www.getcalfresh.org/**\n\n### Sources\n\nYou can verify this information using the source below:\n\n- **CalFresh income limits (FY2026), California Department of Social Services** — https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements *(as of 2026-07-10)*\n\n---\n\nEstimate, not a determination. Confirm with SF HSA. (MOCK response — for development only.)",
+  "final": {
+    "text": "Thanks for sharing your information with us! Here's what we found.\n\n**You may qualify for CalFresh.**\n\nBased on what you told us, your household appears to meet the income guidelines for CalFresh. For a household of 2, the gross monthly income limit is $3,526, and it looks like your income is within that limit.\n\n**Your estimated monthly benefit is $350 per month.**\n\nJust remember — this is only an estimate. Your actual benefit amount could be different depending on factors like your income, expenses (such as rent and utilities), and household size.\n\n### Ready to take the next step?\n\nYou can start your CalFresh application online here:\n**https://www.getcalfresh.org/**\n\n### Sources\n\nYou can verify this information using the source below:\n\n- **CalFresh income limits (FY2026), California Department of Social Services** — https://www.cdss.ca.gov/inforesources/calfresh/eligibility-and-issuance-requirements *(as of 2026-07-10)*\n\n---\n\nEstimate, not a determination. Confirm with SF HSA. (MOCK response — for development only.)",
+    "rewritten": false,
+    "disclaimerAppended": false
+  }
+}
