@@ -38,6 +38,11 @@ export type ScreeningResult = {
   citations: Citation[];
   applyUrl: string;
   disclaimer: string;
+  // Optional, additive (Prompt 3.5): provenance of the live data layer behind
+  // the thresholds. 'cached' = last-good versioned store served because the
+  // live source was unreachable — never silently presented as live.
+  data_freshness?: 'live' | 'cached';
+  dataVersion?: number;
 };
 
 /**

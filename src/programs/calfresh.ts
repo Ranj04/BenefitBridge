@@ -6,6 +6,7 @@
  * next whole dollar; the benefit is whole dollars.
  */
 import type { HouseholdProfile, ScreeningResult, Citation } from '../contracts.ts';
+import type { ScreenDataContext } from '../data/runtime.ts';
 import {
   APPLY_URL,
   CA_STANDARD_MEDICAL_DEDUCTION,
@@ -55,11 +56,32 @@ const CITATIONS: Citation[] = [
   },
 ];
 
-function result(partial: Omit<ScreeningResult, 'program' | 'citations' | 'applyUrl' | 'disclaimer'>): ScreeningResult {
-  return { program: 'CalFresh', citations: CITATIONS, applyUrl: APPLY_URL, disclaimer: DISCLAIMER, ...partial };
+function result(
+  partial: Omit<ScreeningResult, 'program' | 'citations' | 'applyUrl' | 'disclaimer'>,
+  data?: ScreenDataContext,
+): ScreeningResult {
+  const citations = data
+    ? [
+        ...CITATIONS,
+        {
+          text: `FPL basis pulled live from the HHS ASPE Poverty Guidelines API (store v${data.version}, fetched ${data.fplProvenance.fetched_at}${data.freshness === 'cached' ? ' — served from last-good cache' : ''})`,
+          source_url: data.fplProvenance.source_url,
+          as_of: data.fplProvenance.as_of,
+        },
+      ]
+    : CITATIONS;
+  return {
+    program: 'CalFresh',
+    citations,
+    applyUrl: APPLY_URL,
+    disclaimer: DISCLAIMER,
+    ...(data ? { data_freshness: data.freshness, dataVersion: data.version } : {}),
+    ...partial,
+  };
 }
 
-export function screenCalfresh(p: HouseholdProfile): ScreeningResult {
+export function screenCalfresh(p: HouseholdProfile, data?: ScreenDataContext): ScreeningResult {
+  const mk = (partial: Omit<ScreeningResult, 'program' | 'citations' | 'applyUrl' | 'disclaimer'>) => result(partial, data);
   const hh = p.householdSize;
   const computation: { label: string; value: number }[] = [];
   const assumptions: string[] = [];
@@ -71,7 +93,7 @@ export function screenCalfresh(p: HouseholdProfile): ScreeningResult {
 
   // 1. Gross test — elderly/disabled households are exempt (skip to net).
   if (!p.hasElderlyOrDisabled && grossCents > grossLimitCents) {
-    return result({
+    return mk({
       screening: 'unlikely',
       estimatedBenefit: null,
       computation,
@@ -83,7 +105,7 @@ export function screenCalfresh(p: HouseholdProfile): ScreeningResult {
 
   // 2. Deductions. Earned/unearned split is load-bearing (20% earned deduction).
   if (p.earnedIncome == null) {
-    return result({
+    return mk({
       screening: 'need_more_info',
       estimatedBenefit: null,
       computation,
@@ -120,7 +142,7 @@ export function screenCalfresh(p: HouseholdProfile): ScreeningResult {
   let shelterCosts = ZERO;
   if (p.isRenter) {
     if (p.monthlyRent == null) {
-      return result({
+      return mk({
         screening: 'need_more_info',
         estimatedBenefit: null,
         computation,
@@ -152,7 +174,7 @@ export function screenCalfresh(p: HouseholdProfile): ScreeningResult {
 
   // 4. Net test.
   if (net > netLimitCents) {
-    return result({
+    return mk({
       screening: 'unlikely',
       estimatedBenefit: null,
       computation,
@@ -170,7 +192,7 @@ export function screenCalfresh(p: HouseholdProfile): ScreeningResult {
 
   if (benefitDollars <= 0n) {
     computation.push({ label: 'Estimated monthly benefit', value: 0 });
-    return result({
+    return mk({
       screening: 'unlikely',
       estimatedBenefit: null,
       computation,
@@ -184,7 +206,7 @@ export function screenCalfresh(p: HouseholdProfile): ScreeningResult {
   }
   computation.push({ label: 'Estimated monthly benefit', value: Number(benefitDollars) });
 
-  return result({
+  return mk({
     screening: 'likely_qualify',
     estimatedBenefit: { amount: Number(benefitDollars), period: 'monthly' },
     computation,

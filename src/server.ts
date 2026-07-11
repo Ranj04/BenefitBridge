@@ -12,9 +12,25 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
 import { validateProfile } from './validate.ts';
 import { screenCalfresh } from './programs/calfresh.ts';
+import { ensureDataContext, toScreenContext } from './data/runtime.ts';
 
 export function buildServer(): FastifyInstance {
   const app = Fastify({ logger: false });
+
+  // Live-data layer (Prompt 3.5): re-sync FPL from the HHS ASPE API on demand.
+  // TTL-cached in memory; falls back to the last-good versioned store, flagged
+  // 'cached'. Never fatal — the engine's published-chart constants stand alone.
+  app.post('/sync', async () => {
+    const ctx = await ensureDataContext({ force: true });
+    if (!ctx) return { synced: false, reason: 'live API unreachable and no last-good store' };
+    return {
+      synced: true,
+      version: ctx.store.version,
+      freshness: ctx.freshness,
+      generated_at: ctx.store.generated_at,
+      driftWarnings: ctx.driftWarnings,
+    };
+  });
 
   app.post('/screen', async (req, reply) => {
     const v = validateProfile(req.body);
@@ -27,7 +43,8 @@ export function buildServer(): FastifyInstance {
     if (p.monthlyGrossIncome == null) engineErrors.push('monthlyGrossIncome is required for screening');
     if (engineErrors.length) return reply.code(400).send({ error: 'Invalid HouseholdProfile', details: engineErrors });
 
-    const results: ScreeningResult[] = [screenCalfresh(p)];
+    const ctx = await ensureDataContext(); // TTL-cached; null only if no live API and no store
+    const results: ScreeningResult[] = [screenCalfresh(p, ctx ? toScreenContext(ctx) ?? undefined : undefined)];
     return reply.send(results);
   });
 
@@ -38,6 +55,10 @@ export function buildServer(): FastifyInstance {
 const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const port = Number(process.env.PORT ?? 8080);
+  // Warm the live-data layer at startup (non-fatal by design).
+  void ensureDataContext().then((ctx) =>
+    console.log(ctx ? `[data] store v${ctx.store.version} ready (${ctx.freshness})` : '[data] no live data layer — engine constants only'),
+  );
   buildServer()
     .listen({ port, host: '0.0.0.0' })
     .then(() => console.log(`[ENGINE /screen] listening on :${port}`))
