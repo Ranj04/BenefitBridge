@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { makeAgentClient } from '../src/gradient.ts';
 import { INTAKE_CASES, checkCase } from '../src/intake-cases.ts';
 import { validateProfile } from '../src/validate.ts';
+import { writeTrace } from '../src/trace.ts';
 
 const state = JSON.parse(readFileSync(fileURLToPath(new URL('../.gradient-state.json', import.meta.url)), 'utf8'));
 
@@ -38,6 +39,7 @@ function check(label: string, cond: boolean) {
 
 async function main() {
   let ok = true;
+  const intakeResults: Array<Record<string, unknown>> = [];
 
   // Intake extraction across all golden cases (shared with the offline test suite).
   for (const c of INTAKE_CASES) {
@@ -49,6 +51,7 @@ async function main() {
     const failures = checkCase(c, profile);
     ok = check(`[${c.name}] extraction matches expectations (incl. unstated=null)`, failures.length === 0) && ok;
     if (failures.length) failures.forEach((f) => console.log('   -', f));
+    intakeResults.push({ case: c.name, input: c.text, profile, valid: shape.ok, validationErrors: shape.errors, expectationFailures: failures });
   }
 
   // End-to-end through the router → Food → /screen (cited answer + surviving disclaimer).
@@ -62,6 +65,13 @@ async function main() {
   console.log('\nRouter/Food (missing income):\n', a3, '\n');
   ok = check('missing-income → asks / need_more_info, no fabricated $', /income|earn|how much|need more/i.test(a3)) && ok;
 
+  const tracePath = writeTrace('a1', {
+    gate: ok ? 'GREEN' : 'RED',
+    intakeResults,
+    routerFoodEnglishPersona: a1,
+    routerFoodMissingIncome: a3,
+  });
+  console.log(`\nWrote A1 trace ${tracePath}.`);
   console.log(`\n${ok ? 'GATE A1: GREEN' : 'GATE A1: RED'}`);
   process.exit(ok ? 0 : 1);
 }

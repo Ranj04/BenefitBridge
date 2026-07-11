@@ -5,11 +5,11 @@
 
 export const HouseholdProfileJsonSchema = {
   type: 'object',
-  required: ['householdSize', 'monthlyGrossIncome', 'earnedIncome', 'countyFips', 'preferredLanguage'],
+  required: ['householdSize', 'monthlyGrossIncome', 'countyFips', 'preferredLanguage'],
   properties: {
     householdSize: { type: 'integer', minimum: 1 },
     monthlyGrossIncome: { type: 'number', minimum: 0 },
-    earnedIncome: { type: 'number', minimum: 0 },
+    earnedIncome: { type: ['number', 'null'], minimum: 0 },
     hasChildren: { type: 'boolean' },
     childrenAges: { type: 'array', items: { type: 'integer' } },
     hasElderlyOrDisabled: { type: 'boolean' },
