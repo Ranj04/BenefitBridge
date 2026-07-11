@@ -1,0 +1,20 @@
+{
+  "kb": "5fc08ddd-7ce2-11f1-aee4-4e013e2ddde4",
+  "agents": {
+    "bb-food-calfresh": {
+      "uuid": "9a65fedd-7ce3-11f1-aee4-4e013e2ddde4",
+      "endpoint": "https://lrp5gqv6kazmd5zmmz77f76n.agents.do-ai.run",
+      "status": "STATUS_RUNNING"
+    },
+    "bb-router": {
+      "uuid": "9ab10102-7ce3-11f1-aee4-4e013e2ddde4",
+      "endpoint": "https://iqtsfxe4oxz5ahtpfuite6ko.agents.do-ai.run",
+      "status": "STATUS_RUNNING"
+    },
+    "bb-intake": {
+      "uuid": "99df3931-7ce3-11f1-aee4-4e013e2ddde4",
+      "endpoint": "https://s4ozo2lspazo35pnahixd72y.agents.do-ai.run",
+      "status": "STATUS_RUNNING"
+    }
+  }
+}

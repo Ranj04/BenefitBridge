@@ -7,3 +7,6 @@ dist/
 .gradient-state.json
 guardrail-capture.json
 do-function/.env
+do-function/.deployed/
+.claude/projects/
+.DS_Store

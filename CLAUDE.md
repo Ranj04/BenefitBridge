@@ -1,57 +1,68 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code sessions in this repo. BenefitBridge is a public-benefits screener built for the AI for Social Good hackathon (MLH × DigitalOcean). Read `README.md` for the product and architecture; read `benefitbridge-claude-code-full-sequence.md` for the phased build plan before starting any implementation work.
 
-## Current state: planning stage, no code yet
+## Current state
 
-This repo currently contains **only build-plan documents and tooling** — there is no application source, no `package.json`, no tests. The plan docs below are the specification for what gets built. Before writing any code, read the relevant plan doc; it defines contracts, constants, and verification gates you are expected to honor.
+Early implementation. The repo holds the master plan, the per-phase Claude Code prompts, and the first landed code (Person A's Gradient graph scaffold under `src/`, `scripts/`, `do-function/` — see `README-personA.md`). Implementation lands phase by phase. Before creating anything, inspect what already exists (`git status`, `ls`, read the files) and reconcile with it — never clobber or duplicate partial work.
 
-- `benefits-navigator-plan.md` — the master product/architecture plan (§9 interface contracts, §11 phased build).
-- `benefitbridge-claude-code-phase0-1.md` — Person B, Phase 0+1: the deterministic CalFresh screening engine + `POST /screen`. Includes the verified FY2026 constants.
-- `benefitbridge-claude-code-full-sequence.md` — the full 9-prompt run order; STANDING RULES apply to every session.
-- `hearth-claude-code-prompt2-personA.md` — Person A, Prompt 2: the DigitalOcean Gradient AI agent graph that calls `/screen`.
+## Architecture rule (non-negotiable)
 
-Naming note: the product is referred to as **BenefitBridge**, **Benefit**, and **Hearth** across docs — same project.
+**The model does language, the code does math.** LLMs extract profiles, route intent, explain results, and fill form fields. They never assert an eligibility outcome, compute a dollar figure, or make a guarantee. All screening decisions and benefit amounts come from the deterministic engine.
 
-## What this is
+## Stack (exact — do not substitute)
 
-A benefits screener for a 2-person hackathon (MLH × DigitalOcean, AI for Social Good). Turns plain-language free text about someone's situation into (1) programs they likely qualify for, (2) a real personalized dollar estimate per program with the math shown, and (3) a review-ready filled application. Core programs: CalFresh, Medi-Cal, CARE, Lifeline, EITC/CalEITC.
+- TypeScript, Node, **Fastify v4 (never v5)**, `tsx` to run TS, **vitest** for tests
+- **Native `fetch` + `AbortController` — axios is banned**
+- `pg` only where a database is genuinely needed
+- Frontend: Expo + react-native-web + NativeWind (universal iOS + web)
+- Gradient AI via the official DigitalOcean TypeScript SDK (`@digitalocean/gradient`), falling back to the REST API; flag any step that requires the DO console, with the exact console path
+- No new dependencies beyond these without flagging why
 
-## Architecture (as specified in the plans)
+## Money math
 
-Two owners work in parallel against a shared HTTP contract:
+Integer cents, pure `bigint`, everywhere. No floats on any money path. Convert dollars to cents at the boundary, compute in `bigint`, format back only for output. Apply the real SNAP rounding rules (30%-of-net rounds up to the nearest dollar; the benefit rounds down to the whole dollar). Verify gates grep for `parseFloat`, `Number(` on money paths, and float multiplication — keep them clean.
 
-- **Person A (Gradient surface):** DigitalOcean Gradient AI agents — intake (free text → `HouseholdProfile`), router, domain agents, KBs (cited RAG), guardrails, and a *function route* that calls Person B's `/screen`. The LLM does **language only**.
-- **Person B (spine + frontend):** the deterministic screening engine (Fastify), the filer (`/fill` → PDF + browser fill), and the Expo universal app.
+## No invented numbers
 
-The load-bearing boundary: **the model never asserts an eligibility outcome, a dollar figure, or a guarantee.** Every number and yes/no comes from deterministic code in the engine. Agents extract, explain, route, and fill fields — nothing more.
+Constants marked verified in the phase prompts can be used as given. Anything else (allotments, deductions, caps, thresholds) must be pulled from the cited official source (CDSS, USDA FNS, IRS, CA FTB) and stored with `source_url` + `as_of`. If a constant can't be verified, leave `// TODO(VERIFY): <what> from <source>` and mark the dependent test `.todo`. Never guess a number into shipping code.
 
-### Core HTTP contracts (from `benefits-navigator-plan.md` §9)
+**Already verified (usable as given):** `benefitbridge-claude-code-phase0-1.md` provides the CalFresh FY2026 gross (200% FPL) and net (100% FPL) monthly income-limit tables by household size (`as_of: 2026-07-10`). Max allotment, standard deduction, excess-shelter cap, SUA, and medical threshold are NOT provided — pull them from official CDSS FFY2026 sources.
 
-- `POST /screen` — `HouseholdProfile` → `ScreeningResult[]`
-- `POST /fill` — `{profile, program}` → `FilledApplication` (generates PDF, drives browser fill)
-- There is **no** programmatic submit to any government endpoint. The filer stops at the submit button (`status: 'staged_awaiting_user_submit'`); the human clicks submit.
+## The filer boundary
 
-Define `src/contracts.ts` with the `HouseholdProfile` / `ScreeningResult` / `FilledApplication` types exactly as written in the plans — both owners import them.
+The system prepares applications; the human submits. No code path may programmatically submit to a government endpoint. Application status never advances past `staged_awaiting_user_submit`. The browser-fill flow halts hard at the submit button. Browser targets are open front ends (GetCalFresh, fillable PDFs) — never login-gated portals like BenefitsCal.
 
-## Non-negotiable engineering rules (STANDING RULES)
+## PII
 
-These come from the plan docs and override default habits:
+We collect income and immigration status. Profiles are ephemeral — no PII persisted. Encrypt in transit. Audit logs store actions and hashes, not raw personal data. Never echo raw sensitive PII in agent responses, logs, or fixtures.
 
-1. **Stack, exactly:** TypeScript, Node, **Fastify v4 (never v5)**, `tsx` to run TS, **native `fetch` + `AbortController` (never axios)**, **vitest** for tests, `pg` only where a DB is genuinely needed. Frontend: Expo + react-native-web + NativeWind. Don't add deps beyond these without flagging why.
-2. **Money is integer cents, pure `bigint`. No floats in any eligibility/benefit math.** Convert dollars→cents at the boundary, compute in bigint, format back only for output. Apply real SNAP rounding (round 30%×net up to the dollar, benefit down to the dollar).
-3. **Deterministic logic in code, never an LLM.** No model calls anywhere in the engine.
-4. **No invented numbers.** Use only the verified constants provided in the plans. Any unverified constant must be pulled from the cited official source and stored with `source_url` + `as_of`, or left as `// TODO(VERIFY): <what> from <source>` with its dependent test marked `.todo`. Never guess a number into shipping code.
-5. **Verification is adversarial, not happy-path.** Gates must test boundaries, over-threshold failures, the elderly/disabled path, missing inputs, and rounding. A gate that only proves the happy path is a failed gate.
-6. **Feature branch per prompt** (`feat/pN-<slug>` / `feat/phase0-1-screen-engine`); commit at each VERIFY GATE; **never commit to main.**
-7. **State-aware first:** inspect existing repo state before creating anything; reconcile, don't clobber or duplicate; report what you found.
-8. **Surgical:** every changed line traces to a task in the plan. No speculative abstractions or unrequested config.
-9. **Stop at every VERIFY GATE:** run the checks, report pass/fail per check, don't proceed past a red gate. Stop and report at the end of a prompt's scope; don't wander into the next prompt's work.
+## Honesty in output
 
-## Verified constants already provided
+Every figure is an estimate, labeled with a disclaimer, never a determination. Missing inputs produce `need_more_info` or a range, not a silent zero or a false-precision number. Guardrails rewrite "guaranteed" / "you will receive" phrasing into estimate language.
 
-`benefitbridge-claude-code-phase0-1.md` provides the CalFresh FY2026 gross (200% FPL) and net (100% FPL) monthly income limit tables by household size (`as_of: 2026-07-10`) — use these directly. Max allotment, standard deduction, excess-shelter cap, SUA, medical threshold, and minimum benefit are **not** provided and must be pulled from official CDSS FFY2026 sources.
+## Workflow
+
+- One feature branch per phase prompt (`feat/pN-<slug>`); commit at each verify gate. Direct pushes to main only when the user explicitly asks.
+- **Verify gates are adversarial.** Test boundaries (exactly at the limit, one cent over), over-threshold failures, the elderly/disabled path, missing inputs, and rounding — not just the happy path. A gate that only proves success is a failed gate. Stop at every gate, report pass/fail per check, and don't proceed past a red one.
+- Surgical changes only: every changed line traces to a task in the active phase prompt. No speculative abstractions or unrequested config.
+- Stop at the end of the active prompt's scope; don't wander into the next phase.
+
+## Contracts
+
+The shared types (`HouseholdProfile`, `ScreeningResult`, `FilledApplication`) are defined in the phase prompts and land in `src/contracts.ts`. Person A (Gradient layer) and Person B (engine/frontend) both build against them — don't change a contract unilaterally. `ScreeningResult.estimatedBenefit.period` distinguishes monthly benefits from annual lump sums (EITC); the UI must never mislabel one as the other.
 
 ## RocketRide (AI pipeline tooling)
 
 If building AI pipelines, document processing, RAG, or data integration with RocketRide, read the docs in `.rocketride/docs/` first (start with `ROCKETRIDE_README.md`), per `.claude/rules/rocketride.md`. Component schemas live in `.rocketride/schema/`.
+
+## Key files
+
+| File | Purpose |
+|---|---|
+| `README.md` | Product overview + architecture |
+| `README-personA.md` | Person A's Gradient graph: run order, console-only steps, frontend entry point |
+| `benefits-navigator-plan.md` | Master plan: vision, architecture, risks, demo script |
+| `benefitbridge-claude-code-full-sequence.md` | All nine phase prompts, run order, standing rules |
+| `benefitbridge-claude-code-phase0-1.md` | Phase 0–1: CalFresh engine + `/screen` endpoint |
+| `hearth-claude-code-prompt2-personA.md` | Phase 2: Gradient agent graph + guardrails ("Hearth" is an old working name) |

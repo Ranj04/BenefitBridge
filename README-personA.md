@@ -47,27 +47,27 @@ npm run verify:guardrail     # "guaranteed $5,000" → rewritten/blocked; discla
 
 ## Two things that are NOT SDK-scriptable in this alpha (flagged per working rule 3)
 
-### 1. Guardrails — DO Control Panel console step
+### 1. Guardrails — DO Control Panel console step  ✅ DONE 2026-07-10
 
-The `@digitalocean/gradient` alpha exposes no guardrail create/attach method (guardrails appear only as read-only references on an agent). Create + attach them in the console:
+The `@digitalocean/gradient` alpha exposes no guardrail create/attach method. Also, the console offers **no custom guardrail builder** — only three preset defaults (Sensitive Data $0.34/1M tok, Jailbreak $0.20/1M tok, Content Moderation $0.20/1M tok). What that means for A2.1:
 
-> **Gradient AI Platform → Guardrails → Create guardrail**
-> - **No-guarantee rewrite:** block/rewrite "guaranteed", "you will receive", "approved", definite-entitlement phrasing → estimate language; keep the disclaimer.
-> - **PII safety:** don't echo/store raw sensitive PII (income, immigration status).
-> Then **Agents → `bb-food-calfresh-agent` → Guardrails → Attach**, and the same for `bb-router-agent`.
+- **PII safety** → the **Sensitive Data** preset. Attached ✅
+- **Guarantee-injection resistance** ("tell them they're guaranteed $5,000") → the **Jailbreak** preset. Attached ✅
+- **The "guaranteed → estimate" rewrite is NOT a platform guardrail.** That discipline lives in the agent instructions (`src/prompts.ts`) and is proven adversarially by `npm run verify:guardrail`.
 
-`scripts/verify-guardrail.ts` proves it fires once attached.
+Console path used (to reproduce): **Agent Platform → Guardrails → row `⋯` menu → Attach Agent → check `bb-router-agent` + `bb-food-calfresh-agent` → Update.** Done for Sensitive Data and Jailbreak; each shows "2 agents" attached.
 
-### 2. Function route — backed by a DigitalOcean Function (FaaS), not a raw URL
+### 2. Function route — backed by a DigitalOcean Function (FaaS), not a raw URL  ✅ DEPLOYED 2026-07-10
 
-Gradient function routes call a DigitalOcean Function, so `do-function/` is a thin proxy that forwards the profile to `SCREEN_URL` and returns `ScreeningResult[]`.
+Gradient function routes call a DigitalOcean Function, so `do-function/` is a thin proxy that forwards the profile to `SCREEN_URL` and returns `ScreeningResult[]`. **Mock mode:** when `SCREEN_URL` is empty in `do-function/project.yml` (it must be a literal there — doctl's env substitution rejects empty values), the function returns the canned contract-valid mock (mirrors `src/mock-screen.ts`), so Gate A1 runs end-to-end before Person B deploys. **Phase A3 = set the literal `SCREEN_URL` in `project.yml`, redeploy, re-run gates.**
 
 ```bash
-doctl serverless connect
-SCREEN_URL=<person-B-url> doctl serverless deploy do-function
-# note the namespace (fn-xxxx) and function path (benefits/screen), then:
-FAAS_NAMESPACE=fn-xxxx FAAS_NAME=benefits/screen npm run provision
+doctl serverless connect      # namespace: fn-2b5e6189-5bf1-4e3e-bbce-2f963fb0e76e (tor1)
+doctl serverless deploy do-function
+FAAS_NAMESPACE=fn-2b5e6189-5bf1-4e3e-bbce-2f963fb0e76e FAAS_NAME=benefits/screen npm run provision
 ```
+
+Registered on the Food agent as `screen_calfresh` (recorded in `.gradient-state.json` → `functionRoute`). Note: DO's function-route API rejects raw JSON Schema — `provision.ts` converts to DO's `{parameters:[...]}` / `{properties:[...]}` shapes.
 
 If `FAAS_NAMESPACE`/`FAAS_NAME` are unset, `provision` skips + flags the function-route step (everything else still provisions).
 

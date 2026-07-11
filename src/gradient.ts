@@ -14,10 +14,13 @@ export function makeClient(): Gradient {
  * via the OpenAI-compatible chat.completions surface (how the frontend calls the router).
  */
 export function makeAgentClient(agentEndpoint: string, agentAccessKey: string): Gradient {
+  const base = agentEndpoint.replace(/\/$/, '');
   return new Gradient({
-    accessToken: requireEnv('DO_API_TOKEN'),
-    agentEndpoint,
     agentAccessKey,
+    baseURL: `${base}/api/v1`,
+    // The agents run a reasoning model — a single completion can take 30s+.
+    // Raise the per-request timeout well above the SDK default so invokes don't abort.
+    timeout: 120_000,
   });
 }
 

@@ -9,10 +9,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { makeClient, makeAgentClient } from '../src/gradient.ts';
+import { makeAgentClient } from '../src/gradient.ts';
+import { INTAKE_CASES, checkCase } from '../src/intake-cases.ts';
+import { validateProfile } from '../src/validate.ts';
 
 const state = JSON.parse(readFileSync(fileURLToPath(new URL('../.gradient-state.json', import.meta.url)), 'utf8'));
-const admin = makeClient();
 
 async function invokeAgent(endpoint: string, key: string, content: string): Promise<string> {
   const client = makeAgentClient(endpoint, key);
@@ -38,30 +39,28 @@ function check(label: string, cond: boolean) {
 async function main() {
   let ok = true;
 
-  // 1) English persona
-  const p1 = await runIntake('single mom in SF, about $2,800 a month, one kid, renting');
-  console.log('Intake #1:', JSON.stringify(p1));
-  ok = check('#1 householdSize == 2', p1.householdSize === 2) && ok;
-  ok = check('#1 monthlyGrossIncome ~ 2800', Math.abs((p1.monthlyGrossIncome ?? 0) - 2800) <= 50) && ok;
-  ok = check('#1 isRenter == true', p1.isRenter === true) && ok;
-  ok = check('#1 hasChildren == true', p1.hasChildren === true) && ok;
-  ok = check('#1 monthlyRent is null (unstated, not guessed)', p1.monthlyRent === null || p1.monthlyRent === undefined) && ok;
+  // Intake extraction across all golden cases (shared with the offline test suite).
+  for (const c of INTAKE_CASES) {
+    const profile = await runIntake(c.text);
+    console.log(`\nIntake [${c.name}]:`, JSON.stringify(profile));
+    const shape = validateProfile(profile);
+    ok = check(`[${c.name}] profile is contract-valid`, shape.ok) && ok;
+    if (!shape.ok) console.log('   errors:', shape.errors.join('; '));
+    const failures = checkCase(c, profile);
+    ok = check(`[${c.name}] extraction matches expectations (incl. unstated=null)`, failures.length === 0) && ok;
+    if (failures.length) failures.forEach((f) => console.log('   -', f));
+  }
 
+  // End-to-end through the router → Food → /screen (cited answer + surviving disclaimer).
   const a1 = await invokeAgent(state.routerEndpoint, state.routerAgentKey, 'single mom in SF, about $2,800 a month, one kid, renting');
-  console.log('\nRouter/Food #1:\n', a1, '\n');
-  ok = check('#1 answer contains a disclaimer/estimate framing', /estimate|not a determination|confirm/i.test(a1)) && ok;
-  ok = check('#1 answer surfaces a citation URL', /https?:\/\//.test(a1)) && ok;
+  console.log('\nRouter/Food (english persona):\n', a1, '\n');
+  ok = check('answer contains disclaimer/estimate framing', /estimate|not a determination|confirm/i.test(a1)) && ok;
+  ok = check('answer surfaces a citation URL', /https?:\/\//.test(a1)) && ok;
 
-  // 2) Spanish persona
-  const p2 = await runIntake('madre soltera en San Francisco, unos 2,800 dólares al mes, un hijo, alquilando');
-  console.log('Intake #2 (es):', JSON.stringify(p2));
-  ok = check("#2 preferredLanguage == 'es'", p2.preferredLanguage === 'es') && ok;
-  ok = check('#2 householdSize == 2', p2.householdSize === 2) && ok;
-
-  // 3) Missing income
+  // Missing income → asks / need_more_info, never fabricates.
   const a3 = await invokeAgent(state.routerEndpoint, state.routerAgentKey, 'I have two kids and my rent is really high');
-  console.log('\nRouter/Food #3 (missing income):\n', a3, '\n');
-  ok = check('#3 asks for income / need_more_info, no fabricated $ amount', /income|earn|how much|need more/i.test(a3)) && ok;
+  console.log('\nRouter/Food (missing income):\n', a3, '\n');
+  ok = check('missing-income → asks / need_more_info, no fabricated $', /income|earn|how much|need more/i.test(a3)) && ok;
 
   console.log(`\n${ok ? 'GATE A1: GREEN' : 'GATE A1: RED'}`);
   process.exit(ok ? 0 : 1);

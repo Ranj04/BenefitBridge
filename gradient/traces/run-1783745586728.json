@@ -1,0 +1,27 @@
+{
+  "input": "I have two kids and my rent is really high, can I get help?",
+  "screen_url": "http://localhost:8787/screen",
+  "profile": {
+    "householdSize": 3,
+    "monthlyGrossIncome": null,
+    "earnedIncome": null,
+    "hasChildren": true,
+    "childrenAges": null,
+    "hasElderlyOrDisabled": null,
+    "isRenter": true,
+    "monthlyRent": null,
+    "monthlyUtilities": null,
+    "dependentCareCost": null,
+    "medicalExpenses": null,
+    "countyFips": null,
+    "immigrationStatus": null,
+    "preferredLanguage": "en"
+  },
+  "router_reply": "I understand you're juggling a lot with two kids and high rent — that can be really stressful.\n\nRight now, BenefitBridge can help screen for **food assistance** programs like CalFresh/SNAP. Support for other programs, including **cash aid, utility discounts, health coverage, and tax credits**, is coming soon and may be relevant to your situation.\n\nIn the meantime, are you having any trouble affording groceries or feeding your family? If so, I can help connect you with food assistance resources. Just let me know!",
+  "outcome": {
+    "screening": "need_more_info",
+    "missing": [
+      "monthlyGrossIncome"
+    ]
+  }
+}

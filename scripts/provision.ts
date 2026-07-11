@@ -18,15 +18,44 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeClient, pickUuid } from '../src/gradient.ts';
-import { config, RESOURCE_NAMES } from '../src/config.ts';
+import { config, resolveProjectId, RESOURCE_NAMES } from '../src/config.ts';
 import { INTAKE_INSTRUCTION, FOOD_INSTRUCTION, ROUTER_INSTRUCTION } from '../src/prompts.ts';
-import { HouseholdProfileJsonSchema, ScreeningResultArrayJsonSchema } from '../src/schemas.ts';
+import { HouseholdProfileJsonSchema } from '../src/schemas.ts';
 
 const STATE_PATH = resolve(fileURLToPath(new URL('../.gradient-state.json', import.meta.url)));
 const client = makeClient();
 
 type State = Record<string, string>;
 const state: State = {};
+
+/**
+ * DO's function-route API rejects raw JSON Schema ("parameters field is required"):
+ * it wants { parameters: [{ name, in, schema, required, description }] } for input
+ * and { properties: [{ name, type, description }] } for output.
+ */
+function toDoFunctionInputSchema(schema: typeof HouseholdProfileJsonSchema) {
+  const required = new Set<string>(schema.required as readonly string[]);
+  return {
+    parameters: Object.entries(schema.properties).map(([name, prop]: [string, any]) => ({
+      name,
+      in: 'query',
+      schema: { type: Array.isArray(prop.type) ? prop.type[0] : prop.type },
+      required: required.has(name),
+      description: prop.enum ? `One of: ${prop.enum.join(', ')}` : `HouseholdProfile.${name}`,
+    })),
+  };
+}
+
+const DO_SCREEN_OUTPUT_SCHEMA = {
+  properties: [
+    {
+      name: 'body',
+      type: 'array',
+      description:
+        'ScreeningResult[] — per program: screening (likely_qualify | need_more_info | unlikely), estimatedBenefit {amount, period}, computation, assumptions, reason, citations (source_url, as_of), applyUrl, disclaimer. These are the ONLY eligibility outcomes and dollar figures you may state.',
+    },
+  ],
+};
 
 async function findAgentByName(name: string): Promise<any | undefined> {
   const res: any = await client.agents.list();
@@ -37,20 +66,91 @@ async function findKbByName(name: string): Promise<any | undefined> {
   return (res?.knowledge_bases ?? []).find((k: any) => k.name === name);
 }
 
-/** Pick a Claude foundation model UUID and an embedding model UUID from the account. */
+/** Pick a foundation model + embedding model. Prefers active Claude; skips end-of-life models. */
 async function pickModels() {
   const res: any = await client.models.list();
   const models: any[] = res?.models ?? [];
-  const claude = models.find((m) => /claude/i.test(m.name) && m.is_foundational !== false);
-  const embed = models.find(
+  const isActive = (m: any) => m.lifecycle_status !== 'end_of_life';
+  const claudeCandidates = models.filter((m) => /claude/i.test(m.name) && m.is_foundational !== false && isActive(m));
+  const claude =
+    claudeCandidates.find((m) => /sonnet 4\.6|4\.5 sonnet/i.test(m.name)) ??
+    claudeCandidates.find((m) => /sonnet 5|haiku 4\.5/i.test(m.name)) ??
+    claudeCandidates[0];
+  // Order matters twice over:
+  // 1. Agents need DO-parseable function calling for the screen_calfresh route.
+  //    MiMo V2.5 emits its own XML tool_call syntax that DO's runtime does not
+  //    execute (verified 2026-07-10: raw <tool_call> text in the response) — last.
+  // 2. Models with an `agreement` (GPT-oss, Llama 3.3, Kimi K2.5, GLM 5) return
+  //    403 on agent create/update until their terms are accepted in the console.
+  //    GLM-5.2 is the strongest agreement-free model on the account.
+  const fallbacks = [
+    models.find((m) => /^Kimi K2\.6$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^GLM-5\.2$/i.test(m.name) && isActive(m)),
+    models.find((m) => /GPT-oss-120b/i.test(m.name) && isActive(m)),
+    models.find((m) => /llama 3\.3 instruct \(70B\)/i.test(m.name) && isActive(m)),
+    models.find((m) => /^MiMo V2\.5$/i.test(m.name) && isActive(m)),
+  ].filter(Boolean) as any[];
+  const embedCandidates = models.filter(
     (m) => /embed/i.test(m.name) || (m.usecases ?? []).some((u: string) => /embed/i.test(u)),
   );
-  if (!claude) throw new Error('No Claude foundation model found on this account — enable one in Gradient, or edit pickModels().');
+  const embed =
+    embedCandidates.find((m) => /gte large|e5 large|bge m3|multi qa mpnet/i.test(m.name)) ??
+    embedCandidates[0];
+
+  /** Probe agent-create once so we don't fail mid-provision on Anthropic terms (403). */
+  async function canCreate(modelUuid: string): Promise<boolean> {
+    try {
+      const created: any = await client.agents.create({
+        name: `bb-model-probe-${Date.now()}`,
+        instruction: 'probe',
+        model_uuid: modelUuid,
+        region: config.region,
+        project_id: (await resolveProjectId())!,
+      });
+      const uuid = pickUuid(created);
+      if (uuid) await client.agents.delete(uuid).catch(() => undefined);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  let modelUuid: string;
+  let modelName: string;
+  if (claude && (await canCreate(claude.uuid))) {
+    modelUuid = claude.uuid;
+    modelName = claude.name;
+  } else {
+    let picked: any;
+    for (const fb of fallbacks) {
+      if (await canCreate(fb.uuid)) {
+        picked = fb;
+        break;
+      }
+    }
+    if (!picked) {
+      throw new Error(
+        'No agent-compatible model found. In the DO console accept Anthropic model terms, or enable serverless inference.',
+      );
+    }
+    modelUuid = picked.uuid;
+    modelName = picked.name;
+    console.warn(
+      `[warn] Claude agents blocked (accept Anthropic terms: Gradient AI Platform → Models → Anthropic Claude → Accept). Using ${picked.name} for now.`,
+    );
+  }
+
   if (!embed) console.warn('[warn] No embedding model auto-detected; KB may need embedding_model_uuid set manually.');
-  return { modelUuid: claude.uuid as string, embedUuid: embed?.uuid as string | undefined };
+  console.log(`Selected agent model: ${modelName}`);
+  return { modelUuid, embedUuid: embed?.uuid as string | undefined };
 }
 
-async function ensureAgent(name: string, instruction: string, modelUuid: string, kbUuids: string[] = []) {
+async function ensureAgent(
+  name: string,
+  instruction: string,
+  modelUuid: string,
+  projectId: string,
+) {
   const existing = await findAgentByName(name);
   if (existing) {
     console.log(`= agent "${name}" exists [${existing.uuid}] — updating instruction`);
@@ -62,8 +162,7 @@ async function ensureAgent(name: string, instruction: string, modelUuid: string,
     instruction,
     model_uuid: modelUuid,
     region: config.region,
-    project_id: config.projectId,
-    knowledge_base_uuid: kbUuids.length ? kbUuids : undefined,
+    project_id: projectId,
   });
   const uuid = pickUuid(created)!;
   console.log(`+ created agent "${name}" [${uuid}]`);
@@ -71,6 +170,14 @@ async function ensureAgent(name: string, instruction: string, modelUuid: string,
 }
 
 async function main() {
+  const projectId = (await resolveProjectId()) ?? config.projectId;
+  if (!projectId) {
+    throw new Error(
+      'Could not resolve DO project id. Set DO_PROJECT_ID in .env (DigitalOcean → Projects → copy id from URL).',
+    );
+  }
+  console.log(`Using project ${projectId}, region ${config.region}`);
+
   const { modelUuid, embedUuid } = await pickModels();
   console.log(`Using model ${modelUuid}${embedUuid ? `, embedding ${embedUuid}` : ''}\n`);
 
@@ -80,7 +187,7 @@ async function main() {
     const createdKb: any = await client.knowledgeBases.create({
       name: RESOURCE_NAMES.foodKB,
       region: config.region,
-      project_id: config.projectId,
+      project_id: projectId,
       embedding_model_uuid: embedUuid,
       datasources: [
         { web_crawler_data_source: { base_url: 'https://www.sfhsa.org/services/health-food/calfresh', crawling_option: 'DOMAIN' } },
@@ -103,10 +210,18 @@ async function main() {
   }
 
   // --- A1.1 Intake agent ---
-  state.intakeAgentUuid = await ensureAgent(RESOURCE_NAMES.intakeAgent, INTAKE_INSTRUCTION, modelUuid);
+  state.intakeAgentUuid = await ensureAgent(RESOURCE_NAMES.intakeAgent, INTAKE_INSTRUCTION, modelUuid, projectId);
 
-  // --- A1.3 Food domain agent (KB attached) ---
-  state.foodAgentUuid = await ensureAgent(RESOURCE_NAMES.foodAgent, FOOD_INSTRUCTION, modelUuid, [kb.uuid]);
+  // --- A1.3 Food domain agent (KB attached after create — KB DB may still be provisioning) ---
+  state.foodAgentUuid = await ensureAgent(RESOURCE_NAMES.foodAgent, FOOD_INSTRUCTION, modelUuid, projectId);
+  try {
+    await client.agents.knowledgeBases.attachSingle(kb.uuid, { agent_uuid: state.foodAgentUuid });
+    console.log('+ attached food KB to Food agent');
+  } catch (e: any) {
+    console.warn(
+      `  [warn] could not attach KB yet (${e.message}); attach in console once indexing is ready: Agents → ${RESOURCE_NAMES.foodAgent} → Knowledge Bases.`,
+    );
+  }
 
   // --- A1.4 Function route: register /screen (via FaaS proxy) on the Food agent ---
   const faasNamespace = process.env.FAAS_NAMESPACE?.trim();
@@ -118,14 +233,14 @@ async function main() {
         description: 'Deterministic CalFresh screen. Input: HouseholdProfile. Output: ScreeningResult[]. The ONLY source of eligibility outcomes and dollar amounts.',
         faas_namespace: faasNamespace,
         faas_name: faasName,
-        input_schema: HouseholdProfileJsonSchema,
-        output_schema: ScreeningResultArrayJsonSchema,
+        input_schema: toDoFunctionInputSchema(HouseholdProfileJsonSchema),
+        output_schema: DO_SCREEN_OUTPUT_SCHEMA,
       });
       console.log(`+ registered function route "${RESOURCE_NAMES.screenFunction}" on Food agent`);
-      state.functionRoute = `${faasNamespace}/${faasName}`;
     } catch (e: any) {
-      console.warn(`  [warn] function route create failed: ${e.message}`);
+      console.warn(`  [warn] function route create failed (may already exist): ${e.message}`);
     }
+    state.functionRoute = `${faasNamespace}/${faasName}`;
   } else {
     console.warn(
       `  [SKIP + FLAG] Function route not registered: set FAAS_NAMESPACE + FAAS_NAME to the deployed do-function/ proxy (see README-personA.md §Function route). The proxy forwards to SCREEN_URL=${config.screenUrl}.`,
@@ -133,7 +248,7 @@ async function main() {
   }
 
   // --- A1.5 Router agent + route to Food ---
-  state.routerAgentUuid = await ensureAgent(RESOURCE_NAMES.routerAgent, ROUTER_INSTRUCTION, modelUuid);
+  state.routerAgentUuid = await ensureAgent(RESOURCE_NAMES.routerAgent, ROUTER_INSTRUCTION, modelUuid, projectId);
   try {
     await client.agents.routes.add(state.foodAgentUuid, {
       path_parent_agent_uuid: state.routerAgentUuid,
@@ -147,14 +262,21 @@ async function main() {
     console.warn(`  [warn] route add failed (may already exist): ${e.message}`);
   }
 
-  // Capture the router's deployment endpoint + a fresh API key for invocation.
-  const router: any = await client.agents.retrieve(state.routerAgentUuid);
-  state.routerEndpoint = router?.agent?.deployment?.url ?? router?.deployment?.url ?? '';
-  try {
-    const key: any = await client.agents.apiKeys.create(state.routerAgentUuid, { name: 'bb-router-key' } as any);
-    state.routerAgentKey = key?.api_key_info?.secret_key ?? key?.secret_key ?? '';
-  } catch (e: any) {
-    console.warn(`  [warn] could not mint router API key via SDK: ${e.message}. Create one in the console: Agents → ${RESOURCE_NAMES.routerAgent} → Endpoint → API Keys.`);
+  // Capture intake + router deployment endpoints and API keys for verify scripts.
+  for (const [label, uuidKey, endpointKey, secretKey, keyDisplayName] of [
+    ['intake', 'intakeAgentUuid', 'intakeEndpoint', 'intakeAgentKey', 'bb-intake-key'],
+    ['router', 'routerAgentUuid', 'routerEndpoint', 'routerAgentKey', 'bb-router-key'],
+    ['food', 'foodAgentUuid', 'foodEndpoint', 'foodAgentKey', 'bb-food-key'],
+  ] as const) {
+    const uuid = state[uuidKey];
+    const agent: any = await client.agents.retrieve(uuid);
+    state[endpointKey] = agent?.agent?.deployment?.url ?? agent?.deployment?.url ?? '';
+    try {
+      const key: any = await client.agents.apiKeys.create(uuid, { name: keyDisplayName } as any);
+      state[secretKey] = key?.api_key_info?.secret_key ?? key?.secret_key ?? '';
+    } catch (e: any) {
+      console.warn(`  [warn] could not mint ${label} API key: ${e.message}`);
+    }
   }
 
   writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
@@ -163,6 +285,8 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('\n[provision] ERROR:', e.message ?? e);
+  const detail = e?.error?.message ?? e?.message ?? String(e);
+  console.error('\n[provision] ERROR:', detail);
+  if (e?.error) console.error(JSON.stringify(e.error, null, 2));
   process.exit(1);
 });
