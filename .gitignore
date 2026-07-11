@@ -10,3 +10,4 @@ do-function/.env
 do-function/.deployed/
 .claude/projects/
 .DS_Store
+traces/
