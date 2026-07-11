@@ -16,7 +16,7 @@ packages:
       # Person B's live /screen URL. NOTE: a literal value is required — doctl's
       # dollar-brace env substitution rejects empty/unset values (it even scans
       # comments), so we keep the literal here and swap it at A3.
-      SCREEN_URL: ''
+      SCREEN_URL: 'https://benefitbridge-screen-eh945.ondigitalocean.app/screen'
     functions:
       - name: screen
         binary: false
