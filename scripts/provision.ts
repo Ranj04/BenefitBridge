@@ -84,8 +84,8 @@ async function pickModels() {
   //    403 on agent create/update until their terms are accepted in the console.
   //    GLM-5.2 is the strongest agreement-free model on the account.
   const fallbacks = [
-    models.find((m) => /^GLM-5\.2$/i.test(m.name) && isActive(m)),
     models.find((m) => /^Kimi K2\.6$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^GLM-5\.2$/i.test(m.name) && isActive(m)),
     models.find((m) => /GPT-oss-120b/i.test(m.name) && isActive(m)),
     models.find((m) => /llama 3\.3 instruct \(70B\)/i.test(m.name) && isActive(m)),
     models.find((m) => /^MiMo V2\.5$/i.test(m.name) && isActive(m)),
