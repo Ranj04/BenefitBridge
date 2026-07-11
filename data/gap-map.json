@@ -1,0 +1,281 @@
+{
+ "fetched_at": "2026-07-11T18:19:13.632Z",
+ "sources": {
+  "acs": {
+   "url": "https://api.censusreporter.org/1.0/data/show/latest?table_ids=C17002&geo_ids=140|05000US06075",
+   "cite": "US Census Bureau ACS 5-year, table C17002 (ratio of income to poverty level), San Francisco County tracts — via Census Reporter API"
+  },
+  "crosswalk": {
+   "url": "https://data.sfgov.org/resource/sevw-6tgi.json?$limit=400&$select=geoid,neighborhoods_analysis_boundaries,the_geom,data_as_of",
+   "cite": "DataSF: Analysis Neighborhoods — 2020 census tracts assigned to neighborhoods (sevw-6tgi)"
+  },
+  "cf256": {
+   "url": "https://www.cdss.ca.gov/Portals/9/Additional-Resources/Research-and-Data/DSSDS/Tables/CF256%20May%202024%20and%20Ongoing.xlsx",
+   "cite": "CDSS CF 256 — CalFresh participation and benefit issuance, 'May 2024 and Ongoing' workbook (extracted by scripts/extract-cf256.py)"
+  }
+ },
+ "acs_release": "ACS 2024 5-year",
+ "dfa256_month": "2026-05-01",
+ "county": {
+  "eligible": 175889,
+  "enrolled": 106489,
+  "participationRate": 0.6054329719311611,
+  "unenrolled": 69400,
+  "avgBenefitPerPersonMonth": 187.63253481580256,
+  "estUnclaimedPerYearUsd": 156260375
+ },
+ "neighborhoods": [
+  {
+   "name": "Tenderloin",
+   "eligible": 16125,
+   "unenrolled": 6362,
+   "shareUnder200": 0.5077780576898854
+  },
+  {
+   "name": "Bayview Hunters Point",
+   "eligible": 13603,
+   "unenrolled": 5367,
+   "shareUnder200": 0.36145506722644416
+  },
+  {
+   "name": "Mission",
+   "eligible": 13315,
+   "unenrolled": 5254,
+   "shareUnder200": 0.24400747690954405
+  },
+  {
+   "name": "Sunset/Parkside",
+   "eligible": 11667,
+   "unenrolled": 4603,
+   "shareUnder200": 0.15608026755852844
+  },
+  {
+   "name": "South of Market",
+   "eligible": 9539,
+   "unenrolled": 3764,
+   "shareUnder200": 0.37440144438338957
+  },
+  {
+   "name": "Excelsior",
+   "eligible": 8179,
+   "unenrolled": 3227,
+   "shareUnder200": 0.225939226519337
+  },
+  {
+   "name": "Western Addition",
+   "eligible": 7494,
+   "unenrolled": 2957,
+   "shareUnder200": 0.3389876509702809
+  },
+  {
+   "name": "Outer Richmond",
+   "eligible": 7225,
+   "unenrolled": 2851,
+   "shareUnder200": 0.1682580344666977
+  },
+  {
+   "name": "Chinatown",
+   "eligible": 7033,
+   "unenrolled": 2775,
+   "shareUnder200": 0.5836030204962244
+  },
+  {
+   "name": "Nob Hill",
+   "eligible": 5865,
+   "unenrolled": 2314,
+   "shareUnder200": 0.2573384230617349
+  },
+  {
+   "name": "Visitacion Valley",
+   "eligible": 5322,
+   "unenrolled": 2100,
+   "shareUnder200": 0.3241366709300201
+  },
+  {
+   "name": "Oceanview/Merced/Ingleside",
+   "eligible": 4956,
+   "unenrolled": 1955,
+   "shareUnder200": 0.204531385415377
+  },
+  {
+   "name": "Mission Bay",
+   "eligible": 4358,
+   "unenrolled": 1720,
+   "shareUnder200": 0.2591271256986562
+  },
+  {
+   "name": "Bernal Heights",
+   "eligible": 4318,
+   "unenrolled": 1704,
+   "shareUnder200": 0.17962477640500854
+  },
+  {
+   "name": "Outer Mission",
+   "eligible": 4204,
+   "unenrolled": 1659,
+   "shareUnder200": 0.19023485225575817
+  },
+  {
+   "name": "Financial District/South Beach",
+   "eligible": 4192,
+   "unenrolled": 1654,
+   "shareUnder200": 0.1722692528971809
+  },
+  {
+   "name": "Hayes Valley",
+   "eligible": 4062,
+   "unenrolled": 1603,
+   "shareUnder200": 0.21776657910255723
+  },
+  {
+   "name": "West of Twin Peaks",
+   "eligible": 3866,
+   "unenrolled": 1525,
+   "shareUnder200": 0.10548718928210865
+  },
+  {
+   "name": "Lakeshore",
+   "eligible": 3789,
+   "unenrolled": 1495,
+   "shareUnder200": 0.3707073671852069
+  },
+  {
+   "name": "Inner Sunset",
+   "eligible": 3763,
+   "unenrolled": 1485,
+   "shareUnder200": 0.14480317081617733
+  },
+  {
+   "name": "Lone Mountain/USF",
+   "eligible": 3223,
+   "unenrolled": 1272,
+   "shareUnder200": 0.23062611806797853
+  },
+  {
+   "name": "North Beach",
+   "eligible": 2872,
+   "unenrolled": 1133,
+   "shareUnder200": 0.2579022988505747
+  },
+  {
+   "name": "Russian Hill",
+   "eligible": 2804,
+   "unenrolled": 1106,
+   "shareUnder200": 0.1622685185185185
+  },
+  {
+   "name": "Inner Richmond",
+   "eligible": 2572,
+   "unenrolled": 1015,
+   "shareUnder200": 0.12872228617186326
+  },
+  {
+   "name": "Castro/Upper Market",
+   "eligible": 2559,
+   "unenrolled": 1010,
+   "shareUnder200": 0.11700960219478738
+  },
+  {
+   "name": "Haight Ashbury",
+   "eligible": 2315,
+   "unenrolled": 913,
+   "shareUnder200": 0.1403030303030303
+  },
+  {
+   "name": "Portola",
+   "eligible": 2274,
+   "unenrolled": 897,
+   "shareUnder200": 0.15395030803601653
+  },
+  {
+   "name": "Pacific Heights",
+   "eligible": 2253,
+   "unenrolled": 889,
+   "shareUnder200": 0.10024471635150167
+  },
+  {
+   "name": "Noe Valley",
+   "eligible": 2112,
+   "unenrolled": 833,
+   "shareUnder200": 0.09347200708121266
+  },
+  {
+   "name": "Potrero Hill",
+   "eligible": 1979,
+   "unenrolled": 781,
+   "shareUnder200": 0.12702182284980745
+  },
+  {
+   "name": "Marina",
+   "eligible": 1970,
+   "unenrolled": 777,
+   "shareUnder200": 0.08473847212663455
+  },
+  {
+   "name": "Japantown",
+   "eligible": 1313,
+   "unenrolled": 518,
+   "shareUnder200": 0.3395396948538919
+  },
+  {
+   "name": "Glen Park",
+   "eligible": 1185,
+   "unenrolled": 468,
+   "shareUnder200": 0.13763066202090593
+  },
+  {
+   "name": "Treasure Island",
+   "eligible": 1120,
+   "unenrolled": 442,
+   "shareUnder200": 0.4772049424797614
+  },
+  {
+   "name": "Presidio Heights",
+   "eligible": 1052,
+   "unenrolled": 415,
+   "shareUnder200": 0.10758846389854776
+  },
+  {
+   "name": "Twin Peaks",
+   "eligible": 688,
+   "unenrolled": 271,
+   "shareUnder200": 0.10073206442166911
+  },
+  {
+   "name": "Presidio",
+   "eligible": 381,
+   "unenrolled": 150,
+   "shareUnder200": 0.09781771501925546
+  },
+  {
+   "name": "Seacliff",
+   "eligible": 196,
+   "unenrolled": 77,
+   "shareUnder200": 0.07932011331444759
+  },
+  {
+   "name": "McLaren Park",
+   "eligible": 146,
+   "unenrolled": 58,
+   "shareUnder200": 1
+  },
+  {
+   "name": "The Farallones",
+   "eligible": 0,
+   "unenrolled": 0,
+   "shareUnder200": 0
+  },
+  {
+   "name": "Golden Gate Park",
+   "eligible": 0,
+   "unenrolled": 0,
+   "shareUnder200": 0
+  },
+  {
+   "name": "Lincoln Park",
+   "eligible": 0,
+   "unenrolled": 0,
+   "shareUnder200": 0
+  }
+ ]
+}

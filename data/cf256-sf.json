@@ -1,0 +1,10 @@
+{
+ "report_month": "2026-05-01",
+ "county": "San Francisco",
+ "persons": 106489,
+ "households": 79532,
+ "issuance_usd": 19980801,
+ "source_url": "https://www.cdss.ca.gov/Portals/9/Additional-Resources/Research-and-Data/DSSDS/Tables/CF256%20May%202024%20and%20Ongoing.xlsx",
+ "source": "CDSS CF 256 (CalFresh participation and benefit issuance), 'May 2024 and Ongoing' workbook",
+ "fetched_at": "2026-07-11T18:16:31.645846+00:00"
+}
