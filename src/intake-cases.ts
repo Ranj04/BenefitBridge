@@ -25,7 +25,7 @@ export const INTAKE_CASES: IntakeCase[] = [
       monthlyGrossIncome: 2800,
       hasChildren: true,
       isRenter: true,
-      hasElderlyOrDisabled: false,
+      hasElderlyOrDisabled: null, // not stated → null, never guessed (unstated-is-null discipline)
       monthlyRent: null, // amount not stated → must not be guessed
       preferredLanguage: 'en',
       countyFips: '06075',

@@ -18,6 +18,9 @@ export function makeAgentClient(agentEndpoint: string, agentAccessKey: string): 
   return new Gradient({
     agentAccessKey,
     baseURL: `${base}/api/v1`,
+    // The agents run a reasoning model — a single completion can take 30s+.
+    // Raise the per-request timeout well above the SDK default so invokes don't abort.
+    timeout: 120_000,
   });
 }
 
