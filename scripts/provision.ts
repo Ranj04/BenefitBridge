@@ -78,12 +78,19 @@ async function pickModels() {
     claudeCandidates[0];
   // Order matters twice over:
   // 1. Agents need DO-parseable function calling for the screen_calfresh route.
-  //    Kimi K2.6 and MiMo V2.5 can emit raw tool_call markup that DO's runtime
-  //    does not execute in the agent route (verified 2026-07-11) — keep them behind GLM.
+  //    GLM-5.2, Kimi K2.6, and MiMo V2.5 can emit raw tool_call markup that DO's
+  //    runtime does not execute in the agent route (verified 2026-07-11) — keep
+  //    them behind OpenAI/Claude tool-calling models.
   // 2. Models with an `agreement` (GPT-oss, Llama 3.3, Kimi K2.5, GLM 5) return
   //    403 on agent create/update until their terms are accepted in the console.
   //    GLM-5.2 is the strongest agreement-free model on the account.
   const fallbacks = [
+    models.find((m) => /^OpenAI GPT-5\.2$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^OpenAI GPT-5$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^OpenAI GPT-4\.1$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^OpenAI GPT-4o$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^GLM-5\.1$/i.test(m.name) && isActive(m)),
+    models.find((m) => /^MiMo V2\.5 Pro$/i.test(m.name) && isActive(m)),
     models.find((m) => /^GLM-5\.2$/i.test(m.name) && isActive(m)),
     models.find((m) => /^Kimi K2\.6$/i.test(m.name) && isActive(m)),
     models.find((m) => /GPT-oss-120b/i.test(m.name) && isActive(m)),
