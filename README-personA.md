@@ -22,10 +22,11 @@ Branch: `feat/p2-gradient-graph`. SDK: `@digitalocean/gradient` (the official Do
 
 ```bash
 npm install
-cp .env.example .env      # fill DO_API_TOKEN (GenAI scope); SCREEN_URL optional until Person B deploys
+cp .env.example .env      # fill DO_API_TOKEN + BenefitBridge DO_PROJECT_ID; SCREEN_URL optional until Person B deploys
 ```
 
-`DO_API_TOKEN` and `SCREEN_URL` are read from env only — never committed.
+`DO_API_TOKEN`, `DO_PROJECT_ID`, and `SCREEN_URL` are read from env only — never committed. Provisioning refuses to run without an explicit project id.
+After provisioning, the local Fastify server can read agent endpoints and keys from the gitignored `.gradient-state.json`; production uses the explicit `AGENT_INTAKE_URL/KEY` and `AGENT_FOOD_URL/KEY` environment variables.
 
 ## Run order
 

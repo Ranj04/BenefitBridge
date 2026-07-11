@@ -9,7 +9,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
 import { config } from './config.ts';
-import { writeTrace } from './trace.ts';
+import { writeScreenTrace } from './trace.ts';
 
 export function mockCalfresh(p: HouseholdProfile): ScreeningResult {
   const disclaimer =
@@ -85,7 +85,7 @@ export function buildMockApp(): FastifyInstance {
         .send({ error: 'Invalid HouseholdProfile: householdSize and monthlyGrossIncome are required numbers.' });
     }
     const results: ScreeningResult[] = [mockCalfresh(p)];
-    writeTrace('screen', { profile: p, results, mock: true });
+    writeScreenTrace(p, results, true);
     return reply.send(results);
   });
 

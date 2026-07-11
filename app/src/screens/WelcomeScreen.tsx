@@ -59,7 +59,7 @@ export function WelcomeScreen({
           ))}
         </View>
 
-        {/* The precise version of the promise (FTC §5): never sent to us; saving is the user's opt-in choice, on-device, clearable. */}
+        {/* Precise privacy language: screening is remote; optional progress storage is on-device and clearable. */}
         <Text className="mt-3 max-w-md text-center font-body text-caption leading-5 text-ink-muted">{t.privacyLine}</Text>
 
         <Pressable

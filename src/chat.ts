@@ -8,6 +8,7 @@
  * The model does language; every number in the response comes from screenAll.
  */
 import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
+import { existsSync, readFileSync } from 'node:fs';
 import { validateProfile } from './validate.ts';
 import { enforceNoGuarantee } from './guard.ts';
 
@@ -54,11 +55,33 @@ export function parseProfileJson(raw: string): NullableProfile {
 
 export function agentConfig() {
   const { AGENT_INTAKE_URL, AGENT_INTAKE_KEY, AGENT_FOOD_URL, AGENT_FOOD_KEY } = process.env;
-  if (!AGENT_INTAKE_URL || !AGENT_INTAKE_KEY) return null;
-  return {
-    intake: { url: AGENT_INTAKE_URL, key: AGENT_INTAKE_KEY },
-    food: AGENT_FOOD_URL && AGENT_FOOD_KEY ? { url: AGENT_FOOD_URL, key: AGENT_FOOD_KEY } : null,
-  };
+  if (AGENT_INTAKE_URL && AGENT_INTAKE_KEY) {
+    return {
+      intake: { url: AGENT_INTAKE_URL, key: AGENT_INTAKE_KEY },
+      food: AGENT_FOOD_URL && AGENT_FOOD_KEY ? { url: AGENT_FOOD_URL, key: AGENT_FOOD_KEY } : null,
+    };
+  }
+
+  // Local provisioning writes this gitignored, server-side-only state file.
+  // Production and tests require explicit env vars; they never read local keys.
+  if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test') return null;
+  const statePath = new URL('../.gradient-state.json', import.meta.url);
+  if (!existsSync(statePath)) return null;
+  try {
+    const state = JSON.parse(readFileSync(statePath, 'utf8')) as {
+      intakeEndpoint?: string;
+      intakeAgentKey?: string;
+      foodEndpoint?: string;
+      foodAgentKey?: string;
+    };
+    if (!state.intakeEndpoint || !state.intakeAgentKey) return null;
+    return {
+      intake: { url: state.intakeEndpoint, key: state.intakeAgentKey },
+      food: state.foodEndpoint && state.foodAgentKey ? { url: state.foodEndpoint, key: state.foodAgentKey } : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Coercions mirror gradient run-graph: each one is surfaced as an assumption. */

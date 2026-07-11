@@ -69,8 +69,8 @@ export function ResultsScreen({
       ) : error ? (
         <View className="mt-6">
           <ErrorState
-            message="We couldn’t reach the benefits data just now."
-            detail={`Your information is safe — nothing was lost. (${error})`}
+            message="We can’t run that screening just now."
+            detail={error}
             retryLabel="Try again"
             onRetry={onRetry}
           />

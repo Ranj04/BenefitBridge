@@ -1,9 +1,8 @@
 // Pure core of opt-in on-device save/resume: encode/decode/expiry/exclusion
 // logic with zero platform imports, so the privacy-critical rules are unit-
 // testable from the repo's vitest suite. Platform wiring lives in
-// localSession.ts. Nothing here (or there) touches the network: the trust
-// promise is "we never send your information to our servers", and storage is
-// entirely the user's device.
+// localSession.ts. Nothing here (or there) touches the network; optional saved
+// progress stays on the user's device. Screening requests are handled elsewhere.
 
 export const SESSION_VERSION = 1 as const;
 

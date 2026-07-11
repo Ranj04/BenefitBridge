@@ -52,6 +52,7 @@ export function buildServer(): FastifyInstance {
   app.addHook('onSend', async (_req, reply) => {
     reply.header('access-control-allow-origin', '*');
     reply.header('access-control-allow-headers', 'content-type');
+    reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
   });
   app.options('/*', async (_req, reply) => reply.code(204).send());
 
@@ -94,7 +95,11 @@ export function buildServer(): FastifyInstance {
     try {
       const res = await runChat(body.text.trim(), screenAll);
       if (res.agentLayer === 'unconfigured') {
-        return reply.code(503).send({ error: 'agent layer not configured (AGENT_INTAKE_URL/KEY env)', ...res });
+        return reply.code(503).send({
+          code: 'agent_unconfigured',
+          error: 'Free-text intake is unavailable because the Gradient intake agent is not configured.',
+          ...res,
+        });
       }
       return res;
     } catch (e) {

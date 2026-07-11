@@ -24,6 +24,17 @@ const valid = {
 };
 
 describe('POST /screen — the real engine endpoint (adversarial gate 0 checks)', () => {
+  it('allows the Expo dev server to preflight POST requests', async () => {
+    const res = await buildServer().inject({
+      method: 'OPTIONS',
+      url: '/screen',
+      headers: { origin: 'http://localhost:8081', 'access-control-request-method': 'POST' },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+    expect(res.headers['access-control-allow-methods']).toContain('POST');
+  });
+
   it('valid body → 200 with a contract-valid, non-placeholder ScreeningResult[]', async () => {
     const res = await buildServer().inject({ method: 'POST', url: '/screen', payload: valid });
     expect(res.statusCode).toBe(200);

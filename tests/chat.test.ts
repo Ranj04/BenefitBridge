@@ -19,6 +19,7 @@ describe('POST /chat', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('no network'); }));
     const res = await buildServer().inject({ method: 'POST', url: '/chat', payload: { text: 'single mom in SF' } });
     expect(res.statusCode).toBe(503);
+    expect(res.json().code).toBe('agent_unconfigured');
     expect(res.json().agentLayer).toBe('unconfigured');
   });
 

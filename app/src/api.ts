@@ -1,8 +1,17 @@
 import type { ChatResponse, FilledApplication, ScreeningResult, AdversarialResult, NullableProfile } from './types';
 
-// Same-origin in production (static site + API share the App Platform domain);
-// EXPO_PUBLIC_API_URL for local dev against a local engine.
-const BASE = process.env.EXPO_PUBLIC_API_URL ?? '';
+// Same-origin in production (static site + API share the App Platform domain).
+// Local web development runs Expo on :8081 and the Fastify engine on :8080.
+const BASE = process.env.EXPO_PUBLIC_API_URL ?? (__DEV__ ? 'http://localhost:8080' : '');
+
+export class ApiError extends Error {
+  constructor(
+    readonly code: string,
+    readonly status: number,
+  ) {
+    super(code);
+  }
+}
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -11,8 +20,14 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`${path} → ${res.status}: ${detail.slice(0, 200)}`);
+    const contentType = res.headers.get('content-type') ?? '';
+    const payload = contentType.includes('application/json') ? ((await res.json()) as { code?: unknown }) : null;
+    const code = typeof payload?.code === 'string' ? payload.code : 'request_failed';
+    throw new ApiError(code, res.status);
+  }
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`${path} returned an unexpected response`);
   }
   return (await res.json()) as T;
 }

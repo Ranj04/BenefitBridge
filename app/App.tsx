@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Fraunces_600SemiBold, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
 import { AtkinsonHyperlegible_400Regular, AtkinsonHyperlegible_700Bold } from '@expo-google-fonts/atkinson-hyperlegible';
-import { api } from './src/api';
+import { api, ApiError } from './src/api';
 import type { ChatResponse, FilledApplication, AdversarialResult } from './src/types';
 import { useVoiceInput } from './src/hooks/useVoiceInput';
 import { useVoiceOutput } from './src/hooks/useVoiceOutput';
@@ -23,9 +23,24 @@ import offlineFixture from './fixtures/offline.json';
 
 // Three one-click demo personas (Prompt 5 task 5).
 const PERSONAS: readonly Persona[] = [
-  { key: 'p1', label: 'Single parent · $2,800/mo', text: "I'm a single mom in SF, I make about $2,800 a month, one kid, renting for $1,800" },
-  { key: 'p2', label: 'Senior alone · $1,900/mo', text: "I'm 68, live alone in San Francisco on $1,900 a month social security, rent is $1,500" },
-  { key: 'p3', label: 'Over threshold · $2,700/mo', text: 'Single, no kids, San Francisco, I earn $2,700 a month, not renting' },
+  {
+    key: 'p1',
+    label: 'Single parent · $2,800/mo',
+    text: "I'm a single mom in SF, I make about $2,800 a month, one kid, renting for $1,800",
+    profile: { householdSize: 2, monthlyGrossIncome: 2800, earnedIncome: 2800, hasChildren: true, isRenter: true, monthlyRent: 1800, countyFips: '06075', preferredLanguage: 'en' },
+  },
+  {
+    key: 'p2',
+    label: 'Senior alone · $1,900/mo',
+    text: "I'm 68, live alone in San Francisco on $1,900 a month social security, rent is $1,500",
+    profile: { householdSize: 1, monthlyGrossIncome: 1900, earnedIncome: 0, hasElderlyOrDisabled: true, isRenter: true, monthlyRent: 1500, countyFips: '06075', preferredLanguage: 'en' },
+  },
+  {
+    key: 'p3',
+    label: 'Over threshold · $2,700/mo',
+    text: 'Single, no kids, San Francisco, I earn $2,700 a month, not renting',
+    profile: { householdSize: 1, monthlyGrossIncome: 2700, earnedIncome: 2700, hasChildren: false, isRenter: false, countyFips: '06075', preferredLanguage: 'en' },
+  },
 ] as const;
 
 type Fixture = {
@@ -111,7 +126,11 @@ export default function App() {
     try {
       setChat(await api.chat(input, languageHint(lang)));
     } catch (e) {
-      setError((e as Error).message);
+      setError(
+        e instanceof ApiError && e.code === 'agent_unconfigured'
+          ? 'Free-text screening needs the Gradient intake agent. Configure it on the local engine, or choose an example household.'
+          : 'Nothing was lost. Check that the benefits engine is running, then try again.',
+      );
     } finally {
       setBusy(false);
     }
@@ -119,7 +138,23 @@ export default function App() {
 
   const pickPersona = (p: Persona) => {
     setText(p.text);
-    void run(p.text, p.key);
+    setError(null);
+    setChat(null);
+    setLastRun({ input: p.text, personaKey: p.key });
+    setScreen('results');
+    tts.stop();
+    if (offline) {
+      setChat(FIXTURE.personas[p.key] ?? FIXTURE.personas.p1 ?? null);
+      return;
+    }
+    setBusy(true);
+    void api
+      .screen(p.profile)
+      .then((results) => setChat({ profile: p.profile, results, explanation: null, guard: null, needMoreInfo: null, agentLayer: 'live' }))
+      .catch(() => {
+        setError('Nothing was lost. Check that the benefits engine is running, then try again.');
+      })
+      .finally(() => setBusy(false));
   };
 
   // Resume: restore inputs + step, then re-run /screen so every number is
@@ -144,8 +179,8 @@ export default function App() {
     try {
       const results = await api.screen(s.profile);
       setChat({ profile: s.profile, results, explanation: null, guard: null, needMoreInfo: null, agentLayer: 'live' });
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      setError('Nothing was lost. Check that the benefits engine is running, then try again.');
     } finally {
       setBusy(false);
     }
@@ -185,7 +220,7 @@ export default function App() {
 
         {/* Warm, quiet header — brand only; the trust talk lives in the screens. */}
         <View className="border-b border-fog bg-hearth px-5 py-2">
-          <View className="mx-auto w-full max-w-2xl flex-row items-center justify-between">
+          <View className="mx-auto w-full max-w-2xl flex-row flex-wrap items-center justify-between gap-2">
             {screen === 'welcome' ? (
               <View />
             ) : (
@@ -194,7 +229,7 @@ export default function App() {
                 <Text className="font-display text-body text-ink">BenefitBridge</Text>
               </View>
             )}
-            <View className="flex-row items-center gap-2">
+            <View className="ml-auto flex-row items-center gap-2">
               <ClearInfoButton t={t} onClear={clearAll} />
               <Pressable
               className={`min-h-[48px] justify-center rounded-full border px-3 ${offline ? 'border-ember bg-ember-soft' : 'border-fog bg-hearth-surface'}`}
@@ -263,7 +298,11 @@ export default function App() {
               offlineAdversarial={FIXTURE.adversarial}
               offlineFilled={FIXTURE.filled}
               tts={tts}
-              onRetry={() => lastRun && void run(lastRun.input, lastRun.personaKey)}
+              onRetry={() => {
+                const persona = lastRun?.personaKey ? PERSONAS.find((candidate) => candidate.key === lastRun.personaKey) : null;
+                if (persona) pickPersona(persona);
+                else if (lastRun) void run(lastRun.input, null);
+              }}
               onEdit={() => {
                 tts.stop();
                 setScreen('intake');

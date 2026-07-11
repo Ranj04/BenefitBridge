@@ -132,10 +132,12 @@ python3 scripts/extract-cf256.py     # refresh CDSS CalFresh enrollment extract
 npx tsx scripts/build-gap-map.ts     # rebuild the benefits-gap map from live data
 npx tsx src/data/sync.ts 2026        # live FPL sync from the HHS ASPE API
 
-cd app && npm ci && npx expo start   # the universal app (web + iOS)
+cd app && npm ci && npm run web      # web on :8081; local engine defaults to :8080
 ```
 
 Agent-layer env (server-side only, never in the browser): `AGENT_INTAKE_URL/KEY`, `AGENT_FOOD_URL/KEY` — see `CANONICAL.md` for the canonical resource identifiers.
+Local development may instead use the gitignored `.gradient-state.json` written by `npm run provision`; production always requires explicit env vars.
+Gradient provisioning also requires an explicit `DO_PROJECT_ID`; it fails closed rather than selecting the account's default project.
 
 ## Repo layout
 

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { buildMockApp } from '../src/mock-screen.ts';
 
 describe('trace wiring — a request emits a trace', () => {
-  it('POST /screen writes a trace file containing the profile and results', async () => {
+  it('POST /screen writes a trace with a profile hash and no raw household data', async () => {
     const app = buildMockApp();
     const res = await app.inject({
       method: 'POST',
@@ -30,7 +30,9 @@ describe('trace wiring — a request emits a trace', () => {
     const latest = files.sort().at(-1)!;
     const trace = JSON.parse(readFileSync(new URL(latest, traceDir), 'utf8'));
     expect(trace.kind).toBe('screen');
-    expect(trace.profile.householdSize).toBe(2);
-    expect(trace.results[0].program).toBeDefined();
+    expect(trace.profile).toBeUndefined();
+    expect(trace.profileHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(trace.outcomes[0].program).toBeDefined();
+    expect(JSON.stringify(trace)).not.toContain('monthlyGrossIncome');
   });
 });

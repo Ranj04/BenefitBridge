@@ -23,19 +23,9 @@ export function requireEnv(name: string): string {
   return v.trim();
 }
 
-/** Fetch the default DO project id when DO_PROJECT_ID is unset (required by some GenAI creates). */
+/** Project selection is explicit so provisioning can never land in an unrelated default project. */
 export async function resolveProjectId(): Promise<string | undefined> {
-  const fromEnv = process.env.DO_PROJECT_ID?.trim();
-  if (fromEnv) return fromEnv;
-
-  const res = await fetch('https://api.digitalocean.com/v2/projects', {
-    headers: { Authorization: `Bearer ${requireEnv('DO_API_TOKEN')}` },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) return undefined;
-  const data = (await res.json()) as { projects?: Array<{ id: string; is_default?: boolean }> };
-  const projects = data.projects ?? [];
-  return (projects.find((p) => p.is_default) ?? projects[0])?.id;
+  return process.env.DO_PROJECT_ID?.trim() || undefined;
 }
 
 export const config = {

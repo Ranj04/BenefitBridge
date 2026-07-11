@@ -1,7 +1,8 @@
 import { View, Text, Pressable } from 'react-native';
 import { cardShadow } from '../theme/shadow';
+import type { NullableProfile } from '../types';
 
-export type Persona = { key: string; label: string; text: string };
+export type Persona = { key: string; label: string; text: string; profile: NullableProfile };
 
 /** One-tap demo households — each fills the intake field and runs the screen. */
 export function SeedPersonaChips({ personas, onPick, disabled }: { personas: readonly Persona[]; onPick: (p: Persona) => void; disabled?: boolean }) {
