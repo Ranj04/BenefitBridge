@@ -46,6 +46,22 @@ export type ScreeningResult = {
 };
 
 /**
+ * Prompt 4 — the filer output. THE SYSTEM NEVER SUBMITS: status can never be
+ * or advance past 'staged_awaiting_user_submit'; the human clicks submit.
+ */
+export type FilledApplication = {
+  program: string;
+  fields: Record<string, string>; // official form field → value actually filled
+  pdfUrl: string; // URL to the generated filled PDF
+  status: 'draft' | 'ready_for_review' | 'staged_awaiting_user_submit'; // we never submit
+  // Additive (flag to Person A): what the HUMAN must still complete/verify.
+  blankFields?: string[]; // required form items we refused to guess
+  notes?: string[]; // mapping caveats surfaced to the reviewer
+};
+
+// POST /fill  body: { profile: HouseholdProfile, program: 'CalFresh' } → FilledApplication
+
+/**
  * The intake agent must emit EXACTLY this JSON shape (a HouseholdProfile).
  * Unstated fields are null — never guessed. Used to validate intake output.
  */

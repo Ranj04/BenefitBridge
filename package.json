@@ -17,6 +17,7 @@
   "dependencies": {
     "@digitalocean/gradient": "^0.1.0-alpha.2",
     "fastify": "^4.29.1",
+    "pdf-lib": "^1.17.1",
     "tsx": "^4.23.0"
   },
   "devDependencies": {
