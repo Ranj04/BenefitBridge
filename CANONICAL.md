@@ -31,11 +31,16 @@ machine — never in git, never in this file).
 - Backing DigitalOcean Function: **`benefits/screen`** in namespace **`fn-2b5e6189-5bf1-4e3e-bbce-2f963fb0e76e` (tor1)**
 - Source: `do-function/packages/benefits/screen/index.js`; config `do-function/project.yml`
 
-## SCREEN_URL — fill when Person B deploys (Prompt 1)
+## SCREEN_URL — LIVE (Person B deployed 2026-07-11)
 
 ```
-SCREEN_URL = <PENDING — Person B's App Platform URL, full .../screen path>
+SCREEN_URL = https://benefitbridge-screen-eh945.ondigitalocean.app/screen
 ```
+
+App Platform app `benefitbridge-screen` (`407a28a4-2d79-4187-ab50-df793d4bc37f`,
+region tor, branch `feat/phase0-1-screen-engine`, health check `/health`).
+Verified live: real persona → `likely_qualify` $159/monthly, 3 citations,
+disclaimer, no mock markers; malformed body → 400.
 
 The one edit to go live (Phase A3): put the literal URL into
 `do-function/project.yml` (`SCREEN_URL: ''` → the real URL; doctl rejects
