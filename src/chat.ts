@@ -11,6 +11,7 @@ import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { validateProfile } from './validate.ts';
 import { enforceNoGuarantee } from './guard.ts';
+import { extractProfileFromText, mergeProfiles } from './text-profile.ts';
 
 export type NullableProfile = { [K in keyof HouseholdProfile]: HouseholdProfile[K] | null };
 
@@ -132,20 +133,22 @@ export async function runChat(
     return { profile: null, results: null, explanation: null, guard: null, needMoreInfo: null, agentLayer: 'unconfigured' };
   }
 
-  const intakeRaw = await chatCompletion(cfg.intake.url, cfg.intake.key, freeText, INTAKE_TIMEOUT_MS);
-  // Degrade gracefully: if the intake agent can't turn the text into a valid
-  // profile (e.g. gibberish or a refusal → prose, not JSON), ask for the
-  // essentials instead of throwing a 502 (which the DO edge renders as a 504).
-  let parsed: NullableProfile;
+  // Deterministic read of the raw text, always. The agent is the primary
+  // extractor, but it can return prose, drop a field, or time out — and when it
+  // does we must not turn around and ask the user for something they already
+  // told us ("3k month", "only me in th house"). This is the floor under it.
+  const local = extractProfileFromText(freeText);
+
+  let fromAgent: NullableProfile | null = null;
   try {
-    parsed = parseProfileJson(intakeRaw);
+    const candidate = parseProfileJson(await chatCompletion(cfg.intake.url, cfg.intake.key, freeText, INTAKE_TIMEOUT_MS));
+    if (validateProfile(candidate).ok) fromAgent = candidate;
   } catch {
-    return { profile: null, results: null, explanation: null, guard: null, needMoreInfo: ['householdSize', 'monthlyGrossIncome'], agentLayer: 'live' };
+    fromAgent = null; // non-JSON, refusal, timeout, or a 5xx from the agent
   }
-  const v = validateProfile(parsed);
-  if (!v.ok) {
-    return { profile: parsed, results: null, explanation: null, guard: null, needMoreInfo: ['householdSize', 'monthlyGrossIncome'], agentLayer: 'live' };
-  }
+
+  // Agent values win where present; the local read fills only the holes.
+  const { profile: parsed, assumptions: readBacks } = mergeProfiles(fromAgent, local);
 
   const completed = completeProfile(parsed);
   if ('missing' in completed) {
@@ -153,7 +156,7 @@ export async function runChat(
   }
 
   const results = await screenAll(completed.profile);
-  for (const r of results) r.assumptions.unshift(...completed.assumptions);
+  for (const r of results) r.assumptions.unshift(...readBacks, ...completed.assumptions);
 
   const calfresh = results.find((r) => r.program === 'CalFresh') ?? results[0];
   let explanation: string | null = null;
