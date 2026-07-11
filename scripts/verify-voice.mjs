@@ -1,12 +1,20 @@
 // Run: node scripts/verify-voice.mjs (needs Playwright: `npx playwright install chromium`
 // + a running app: cd app && EXPO_PUBLIC_API_URL=<engine url> npx expo start --web --port 8081).
-// Not a package.json dependency by design — no new deps in the app or engine.
+// Not a package.json dependency by design — no new deps in the app or engine;
+// resolvable normally or via PLAYWRIGHT_MODULES=<abs path to a node_modules dir
+// containing playwright> (same convention as app/scripts/verify-*.mjs).
 // Adversarial verify gates A–E for Hearth voice + multilingual intake.
 // Drives the real Expo web app against the LIVE agent backend. SpeechRecognition
 // is scripted (headless Chromium has no mic/ASR service): the fake emits interim
 // then final results exactly like Chrome's implementation, so the entire UI
 // wiring (interim display → editable field → submit → live intake agent) is real.
-import { chromium } from 'playwright';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+
+const require = createRequire(
+  process.env.PLAYWRIGHT_MODULES ? join(process.env.PLAYWRIGHT_MODULES, 'x.js') : import.meta.url,
+);
+const { chromium } = require('playwright');
 
 const APP = 'http://localhost:8081';
 const results = [];
@@ -40,7 +48,12 @@ const FAKE_ASR = `
 `;
 
 async function newPage(browser, { withASR }) {
-  const ctx = await browser.newContext();
+  // reducedMotion: the mic ring runs an infinite listening pulse (IntakeInput.tsx),
+  // which never satisfies Playwright's element-stability check and wedged gate B
+  // forever. Emulating prefers-reduced-motion stills the pulse via the app's own
+  // useReducedMotion hook — a real user setting, not a test-only backdoor — while
+  // every gate still exercises the full live flow.
+  const ctx = await browser.newContext({ reducedMotion: 'reduce' });
   if (withASR) await ctx.addInitScript(FAKE_ASR);
   else await ctx.addInitScript(`delete window.SpeechRecognition; delete window.webkitSpeechRecognition;`);
   const page = await ctx.newPage();

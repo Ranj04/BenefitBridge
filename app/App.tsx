@@ -7,10 +7,10 @@ import { useFonts } from 'expo-font';
 import { Fraunces_600SemiBold, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
 import { AtkinsonHyperlegible_400Regular, AtkinsonHyperlegible_700Bold } from '@expo-google-fonts/atkinson-hyperlegible';
 import { api, ApiError } from './src/api';
-import type { ChatResponse, FilledApplication, AdversarialResult } from './src/types';
+import type { ChatResponse, FilledApplication, AdversarialResult, NullableProfile } from './src/types';
 import { useVoiceInput } from './src/hooks/useVoiceInput';
 import { useVoiceOutput } from './src/hooks/useVoiceOutput';
-import { STRINGS, bcp47For, defaultLanguage, languageHint, type LangCode } from './src/i18n';
+import { STRINGS, bcp47For, defaultLanguage, fieldLabel, languageHint, type LangCode } from './src/i18n';
 import { T } from './src/theme/tokens';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { IntakeScreen } from './src/screens/IntakeScreen';
@@ -62,7 +62,7 @@ export default function App() {
 
   const [screen, setScreen] = useState<Screen>('welcome');
   const [text, setText] = useState('');
-  const [lastRun, setLastRun] = useState<{ input: string; personaKey: string | null } | null>(null);
+  const [lastRun, setLastRun] = useState<{ input: string; personaKey: string | null; profile: NullableProfile | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatResponse | null>(null);
@@ -111,10 +111,38 @@ export default function App() {
   });
   const tts = useVoiceOutput();
 
+  // Request-sequence guard: only the latest run may write chat/error/busy, so
+  // a slow earlier response can never overwrite a newer one (or resurrect
+  // just-cleared data). Every async path takes a token; every cancel bumps it.
+  const runSeq = useRef(0);
+
+  // Map a caught error to translated, honest copy. A 400 with validation
+  // details means OUR inputs were incomplete — say which ones, in plain
+  // language, instead of blaming the engine.
+  const messageFor = (e: unknown): string => {
+    if (e instanceof ApiError) {
+      if (e.code === 'timeout') return t.errTimeout;
+      if (e.code === 'agent_unconfigured') return t.errAgentUnconfigured;
+      if (e.status === 400 && e.details?.length) {
+        const labels = [
+          ...new Set(
+            e.details.map((d) => {
+              const field = /^[a-zA-Z][a-zA-Z0-9]*/.exec(d)?.[0];
+              return field ? fieldLabel(lang, field) : d;
+            }),
+          ),
+        ];
+        return t.errBadRequest(labels.join(', '));
+      }
+    }
+    return t.errEngineDown;
+  };
+
   const run = async (input: string, personaKey: string | null) => {
+    const token = ++runSeq.current;
     setError(null);
     setChat(null);
-    setLastRun({ input, personaKey });
+    setLastRun({ input, personaKey, profile: null });
     setScreen('results');
     tts.stop();
     if (offline) {
@@ -124,37 +152,45 @@ export default function App() {
     }
     setBusy(true);
     try {
-      setChat(await api.chat(input, languageHint(lang)));
+      const res = await api.chat(input, languageHint(lang));
+      if (runSeq.current !== token) return; // stale response — a newer run owns the screen
+      setChat(res);
     } catch (e) {
-      setError(
-        e instanceof ApiError && e.code === 'agent_unconfigured'
-          ? 'Free-text screening needs the Gradient intake agent. Configure it on the local engine, or choose an example household.'
-          : 'Nothing was lost. Check that the benefits engine is running, then try again.',
-      );
+      if (runSeq.current !== token) return;
+      setError(messageFor(e));
     } finally {
-      setBusy(false);
+      if (runSeq.current === token) setBusy(false);
+    }
+  };
+
+  // Deterministic /screen from a known profile (personas, resume, retry).
+  const runScreen = async (profile: NullableProfile, personaKey: string | null, input: string) => {
+    const token = ++runSeq.current;
+    setError(null);
+    setChat(null);
+    setLastRun({ input, personaKey, profile });
+    setScreen('results');
+    tts.stop();
+    if (offline) {
+      setChat(FIXTURE.personas[personaKey ?? 'p1'] ?? FIXTURE.personas.p1 ?? null);
+      return;
+    }
+    setBusy(true);
+    try {
+      const results = await api.screen(profile);
+      if (runSeq.current !== token) return;
+      setChat({ profile, results, explanation: null, guard: null, needMoreInfo: null, agentLayer: 'live' });
+    } catch (e) {
+      if (runSeq.current !== token) return;
+      setError(messageFor(e));
+    } finally {
+      if (runSeq.current === token) setBusy(false);
     }
   };
 
   const pickPersona = (p: Persona) => {
     setText(p.text);
-    setError(null);
-    setChat(null);
-    setLastRun({ input: p.text, personaKey: p.key });
-    setScreen('results');
-    tts.stop();
-    if (offline) {
-      setChat(FIXTURE.personas[p.key] ?? FIXTURE.personas.p1 ?? null);
-      return;
-    }
-    setBusy(true);
-    void api
-      .screen(p.profile)
-      .then((results) => setChat({ profile: p.profile, results, explanation: null, guard: null, needMoreInfo: null, agentLayer: 'live' }))
-      .catch(() => {
-        setError('Nothing was lost. Check that the benefits engine is running, then try again.');
-      })
-      .finally(() => setBusy(false));
+    void runScreen(p.profile, p.key, p.text);
   };
 
   // Resume: restore inputs + step, then re-run /screen so every number is
@@ -171,19 +207,9 @@ export default function App() {
       setScreen('intake');
       return;
     }
-    setLastRun(s.intakeText ? { input: s.intakeText, personaKey: null } : null);
-    setError(null);
-    setChat(null);
-    setScreen('results');
-    setBusy(true);
-    try {
-      const results = await api.screen(s.profile);
-      setChat({ profile: s.profile, results, explanation: null, guard: null, needMoreInfo: null, agentLayer: 'live' });
-    } catch {
-      setError('Nothing was lost. Check that the benefits engine is running, then try again.');
-    } finally {
-      setBusy(false);
-    }
+    // Carry the saved profile in lastRun so "Try again" can re-run /screen
+    // even when the session had no intake text.
+    await runScreen(s.profile, null, s.intakeText);
   };
 
   const startFresh = () => {
@@ -194,6 +220,8 @@ export default function App() {
   // "Clear my information": wipe the device store and reset every piece of
   // in-memory state that came from the user.
   const clearAll = () => {
+    runSeq.current++; // orphan any in-flight response so it can't resurrect cleared data
+    setBusy(false);
     void clearSession();
     tts.stop();
     setSaveEnabled(false);
@@ -235,11 +263,11 @@ export default function App() {
               className={`min-h-[48px] justify-center rounded-full border px-3 ${offline ? 'border-ember bg-ember-soft' : 'border-fog bg-hearth-surface'}`}
               onPress={() => setOffline((o) => !o)}
               accessibilityRole="button"
-              accessibilityLabel="Toggle offline demo mode"
+              accessibilityLabel={t.offlineToggleA11y}
               accessibilityState={{ selected: offline }}
             >
               <Text className={`font-bodybold text-caption ${offline ? 'text-ember-text' : 'text-ink-muted'}`}>
-                {offline ? 'Offline demo: on' : 'Offline demo'}
+                {offline ? t.offlineToggleOn : t.offlineToggle}
               </Text>
               </Pressable>
             </View>
@@ -249,7 +277,7 @@ export default function App() {
         {offline ? (
           <View className="border-b border-ember bg-ember-soft px-5 py-2">
             <Text className="mx-auto w-full max-w-2xl text-center font-bodybold text-caption text-ember-text">
-              Offline — replaying a captured real result (recorded from the live system)
+              {t.offlineBanner}
             </Text>
           </View>
         ) : null}
@@ -267,6 +295,7 @@ export default function App() {
               onStart={() => setScreen('intake')}
               personas={PERSONAS}
               onPersona={pickPersona}
+              busy={busy}
             />
           ) : screen === 'intake' ? (
             <IntakeScreen
