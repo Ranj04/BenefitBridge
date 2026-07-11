@@ -11,7 +11,12 @@ parameters: {}
 packages:
   - name: benefits
     environment:
-      SCREEN_URL: ${SCREEN_URL}
+      # Empty = MOCK MODE: the function returns the canned contract-valid
+      # ScreeningResult[] (mirrors src/mock-screen.ts). Phase A3: set this to
+      # Person B's live /screen URL. NOTE: a literal value is required — doctl's
+      # dollar-brace env substitution rejects empty/unset values (it even scans
+      # comments), so we keep the literal here and swap it at A3.
+      SCREEN_URL: ''
     functions:
       - name: screen
         binary: false
