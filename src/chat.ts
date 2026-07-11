@@ -8,6 +8,7 @@
  * The model does language; every number in the response comes from screenAll.
  */
 import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
+import { HOUSEHOLD_PROFILE_KEYS } from './contracts.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { validateProfile } from './validate.ts';
 import { enforceNoGuarantee } from './guard.ts';
@@ -22,6 +23,9 @@ export type ChatResponse = {
   guard: { rewritten: boolean; disclaimerAppended: boolean } | null;
   needMoreInfo: string[] | null;
   agentLayer: 'live' | 'unconfigured';
+  // Additive: true when the model's prose mentioned a dollar figure the engine
+  // never produced, so it was replaced with the deterministic explanation.
+  explanationDegraded?: boolean;
 };
 
 // Bound each agent call so the two sequential calls stay well under the DO App
@@ -124,6 +128,65 @@ export function completeProfile(p: NullableProfile): { profile: HouseholdProfile
   };
 }
 
+/**
+ * Deterministic dollar cross-check — CODE, not a model. The money path stays
+ * float-free: every figure is compared as integer cents in `bigint`.
+ * Extracts $1,234 / $1234 / $1,234.56 forms from prose.
+ */
+export function extractDollarCents(text: string): bigint[] {
+  const cents: bigint[] = [];
+  for (const m of text.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?/g)) {
+    cents.push(BigInt(m[1]!.replace(/,/g, '')) * 100n + BigInt((m[2] ?? '').padEnd(2, '0') || '00'));
+  }
+  return cents;
+}
+
+/** Engine numbers (dollars, possibly with decimals) → integer cents without float math. */
+function engineNumberToCents(n: number): bigint | null {
+  const m = String(n).match(/^-?(\d+)(?:\.(\d+))?$/);
+  if (!m) return null; // exponent notation etc. — never a real engine figure
+  // Absolute value: the model may narrate a negative computation line as "$X".
+  return BigInt(m[1]!) * 100n + BigInt((m[2] ?? '').padEnd(2, '0').slice(0, 2) || '00');
+}
+
+/** Every dollar figure the engine actually produced for this request, in cents. */
+export function allowedAmountCents(results: ScreeningResult[]): Set<bigint> {
+  const allowed = new Set<bigint>();
+  const add = (n: number) => {
+    const c = engineNumberToCents(n);
+    if (c != null) allowed.add(c);
+  };
+  for (const r of results) {
+    if (r.estimatedBenefit) {
+      const a = r.estimatedBenefit.amount;
+      if (typeof a === 'number') add(a);
+      else {
+        add(a.low);
+        add(a.high);
+      }
+    }
+    for (const c of r.computation) add(c.value);
+  }
+  return allowed;
+}
+
+/** True iff every dollar amount in the prose is one the engine produced. */
+export function explanationAmountsVerified(text: string, results: ScreeningResult[]): boolean {
+  const allowed = allowedAmountCents(results);
+  return extractDollarCents(text).every((c) => allowed.has(c));
+}
+
+/** Field names picked out of validateProfile error strings ("<field> must be …"). */
+export function fieldsFromValidationErrors(errors: string[]): string[] {
+  const keys = HOUSEHOLD_PROFILE_KEYS as readonly string[];
+  const out = new Set<string>();
+  for (const e of errors) {
+    const lead = e.split(/[ ,]/, 1)[0] ?? '';
+    if (keys.includes(lead)) out.add(lead);
+  }
+  return [...out];
+}
+
 export async function runChat(
   freeText: string,
   screenAll: (p: HouseholdProfile) => Promise<ScreeningResult[]>,
@@ -150,9 +213,17 @@ export async function runChat(
   // Agent values win where present; the local read fills only the holes.
   const { profile: parsed, assumptions: readBacks } = mergeProfiles(fromAgent, local);
 
+  // needMoreInfo is derived, never hardcoded: the required fields that are
+  // actually absent, plus any field whose stated value failed validation.
+  const shape = validateProfile(parsed);
+  const invalid = shape.ok
+    ? []
+    : fieldsFromValidationErrors(shape.errors).filter((f) => (parsed as Record<string, unknown>)[f] != null);
+
   const completed = completeProfile(parsed);
-  if ('missing' in completed) {
-    return { profile: parsed, results: null, explanation: null, guard: null, needMoreInfo: completed.missing, agentLayer: 'live' };
+  if ('missing' in completed || invalid.length) {
+    const needMoreInfo = [...new Set([...('missing' in completed ? completed.missing : []), ...invalid])];
+    return { profile: parsed, results: null, explanation: null, guard: null, needMoreInfo, agentLayer: 'live' };
   }
 
   const results = await screenAll(completed.profile);
@@ -161,6 +232,7 @@ export async function runChat(
   const calfresh = results.find((r) => r.program === 'CalFresh') ?? results[0];
   let explanation: string | null = null;
   let guard: ChatResponse['guard'] = null;
+  let explanationDegraded = false;
   if (cfg.food) {
     const prompt = `HouseholdProfile:\n${JSON.stringify(completed.profile)}\n\nScreeningResult (from the deterministic engine):\n${JSON.stringify(calfresh)}\n\nExplain this result to the user in their preferred language (${completed.profile.preferredLanguage}).`;
     try {
@@ -168,8 +240,16 @@ export async function runChat(
       // a deterministic explanation, so /chat never hangs into a gateway 504.
       const raw = await chatCompletion(cfg.food.url, cfg.food.key, prompt, FOOD_TIMEOUT_MS);
       const guarded = enforceNoGuarantee(raw, calfresh.disclaimer);
-      explanation = guarded.text;
       guard = { rewritten: guarded.rewritten, disclaimerAppended: guarded.disclaimerAppended };
+      if (explanationAmountsVerified(guarded.text, results)) {
+        explanation = guarded.text;
+      } else {
+        // The model mentioned a dollar figure the engine never produced. Honesty
+        // rule: no unverifiable number reaches the client — degrade to the
+        // deterministic narration of the engine's own results, and say so.
+        explanation = deterministicExplanation(results, calfresh.disclaimer);
+        explanationDegraded = true;
+      }
     } catch {
       explanation = deterministicExplanation(results, calfresh.disclaimer);
     }
@@ -177,7 +257,15 @@ export async function runChat(
     explanation = deterministicExplanation(results, calfresh.disclaimer);
   }
 
-  return { profile: parsed, results, explanation, guard, needMoreInfo: null, agentLayer: 'live' };
+  return {
+    profile: parsed,
+    results,
+    explanation,
+    guard,
+    needMoreInfo: null,
+    agentLayer: 'live',
+    ...(explanationDegraded ? { explanationDegraded: true } : {}),
+  };
 }
 
 /**

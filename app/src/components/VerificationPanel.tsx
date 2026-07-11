@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Platform } from 'react-native';
 import type { ScreeningResult, NullableProfile, AdversarialResult, ChatResponse } from '../types';
+import type { Strings, LangCode } from '../i18n';
+import { fieldLabel } from '../i18n';
 import { api } from '../api';
 import { fmtUsd } from '../lib/derive';
 import { cardShadow } from '../theme/shadow';
@@ -9,27 +11,9 @@ import { ProvenanceStamp } from './ProvenanceStamp';
 
 const MONO = Platform.select({ web: 'ui-monospace, SFMono-Regular, Menlo, monospace', default: 'Courier' });
 
-// Plain-language names for the parsed profile fields.
-const FIELD_LABEL: Record<string, string> = {
-  householdSize: 'People in your household',
-  monthlyGrossIncome: 'Monthly income (before taxes)',
-  earnedIncome: 'Of that, earned from work',
-  hasChildren: 'Children at home',
-  childrenAges: 'Children’s ages',
-  hasElderlyOrDisabled: 'Anyone 60+ or disabled',
-  isRenter: 'Renting your home',
-  monthlyRent: 'Monthly rent',
-  monthlyUtilities: 'Monthly utilities',
-  dependentCareCost: 'Child or dependent care costs',
-  medicalExpenses: 'Medical expenses',
-  countyFips: 'County',
-  immigrationStatus: 'Immigration status',
-  preferredLanguage: 'Preferred language',
-};
-
-function friendly(v: unknown): string {
-  if (v === null || v === undefined) return 'not stated — we never guess';
-  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+function friendly(v: unknown, t: Strings): string {
+  if (v === null || v === undefined) return t.verifyNotStated;
+  if (typeof v === 'boolean') return v ? t.verifyYes : t.verifyNo;
   if (typeof v === 'number') return v >= 100 ? fmtUsd(v) : String(v);
   if (Array.isArray(v)) return v.join(', ');
   return String(v);
@@ -42,12 +26,16 @@ function friendly(v: unknown): string {
  * with a button that attacks it live.
  */
 export function VerificationPanel({
+  t,
+  lang,
   profile,
   results,
   guard,
   offline,
   offlineAdversarial,
 }: {
+  t: Strings;
+  lang: LangCode;
   profile: NullableProfile;
   results: ScreeningResult[];
   guard: ChatResponse['guard'];
@@ -56,11 +44,11 @@ export function VerificationPanel({
 }) {
   const [adv, setAdv] = useState<AdversarialResult | null>(null);
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
 
   const runAdversarial = async () => {
-    setError(null);
+    setFailed(false);
     if (offline) {
       setAdv(offlineAdversarial);
       return;
@@ -68,8 +56,9 @@ export function VerificationPanel({
     setRunning(true);
     try {
       setAdv(await api.adversarial());
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      // No raw error codes to the user — the translated friendly copy renders below.
+      setFailed(true);
     } finally {
       setRunning(false);
     }
@@ -82,22 +71,20 @@ export function VerificationPanel({
   return (
     <View className="mb-4 rounded-card bg-hearth-surface p-5" style={cardShadow}>
       <Text className="font-display text-h3 text-ink" accessibilityRole="header">
-        See how we know
+        {t.verifyTitle}
       </Text>
-      <Text className="mt-1 font-body text-caption leading-5 text-ink-muted">
-        The AI only reads and explains. Every number comes from deterministic code you can check — here is all of it.
-      </Text>
+      <Text className="mt-1 font-body text-caption leading-5 text-ink-muted">{t.verifySub}</Text>
 
       {/* 1 — what we understood */}
       <Text className="mt-5 font-bodybold text-body text-ink" accessibilityRole="header">
-        Here’s what we understood
+        {t.verifyUnderstood}
       </Text>
       <View className="mt-2 rounded-card border border-fog bg-hearth px-4 py-1">
         {Object.entries(profile).map(([k, v]) => (
           <View key={k} className="flex-row items-baseline justify-between gap-3 border-b border-fog py-2 last:border-b-0">
-            <Text className="flex-1 font-body text-caption text-ink-muted">{FIELD_LABEL[k] ?? k}</Text>
+            <Text className="flex-1 font-body text-caption text-ink-muted">{fieldLabel(lang, k)}</Text>
             <Text className={`font-bodybold text-caption ${v === null || v === undefined ? 'text-ink-muted' : 'text-ink'}`}>
-              {friendly(v)}
+              {friendly(v, t)}
             </Text>
           </View>
         ))}
@@ -106,10 +93,10 @@ export function VerificationPanel({
         className="min-h-[48px] justify-center self-start"
         onPress={() => setShowRaw((s) => !s)}
         accessibilityRole="button"
-        accessibilityLabel={showRaw ? 'Hide the raw parsed profile' : 'Show the raw parsed profile'}
+        accessibilityLabel={showRaw ? t.verifyHideRaw : t.verifyShowRaw}
         accessibilityState={{ expanded: showRaw }}
       >
-        <Text className="font-bodybold text-caption text-pine">{showRaw ? 'Hide raw profile ▴' : 'Raw profile (JSON) ▾'}</Text>
+        <Text className="font-bodybold text-caption text-pine">{showRaw ? t.verifyHideRaw : t.verifyShowRaw}</Text>
       </Pressable>
       {showRaw ? (
         <View className="rounded-card bg-pine-deep p-3">
@@ -124,7 +111,7 @@ export function VerificationPanel({
         r.computation.length ? (
           <View key={r.program} className="mt-5">
             <Text className="font-bodybold text-body text-ink" accessibilityRole="header">
-              {r.program} — the math, line by line
+              {t.verifyMathTitle(r.program)}
             </Text>
             <View className="mt-2 rounded-card border border-fog bg-hearth px-4 py-1">
               {r.computation.map((line, i) => (
@@ -138,7 +125,7 @@ export function VerificationPanel({
             </View>
             {r.assumptions.length > 0 ? (
               <Text className="mt-2 font-body text-caption italic leading-5 text-ink-muted">
-                Assumptions we made (and tell you about): {r.assumptions.join(' · ')}
+                {t.verifyAssumptions(r.assumptions.join(' · '))}
               </Text>
             ) : null}
           </View>
@@ -157,15 +144,11 @@ export function VerificationPanel({
         <View className="flex-row items-center gap-2">
           <View className={`h-2.5 w-2.5 rounded-full ${guardClean === false ? 'bg-ember' : 'bg-moss'}`} />
           <Text className={`font-bodybold text-body ${guardClean === false ? 'text-ember-text' : 'text-moss-text'}`}>
-            Guardrail: {guardClean === false ? 'caught and rewrote a promise' : 'clean'}
+            {guardClean === false ? t.verifyGuardCaught : t.verifyGuardClean}
           </Text>
         </View>
         <Text className={`mt-1 font-body text-caption leading-5 ${guardClean === false ? 'text-ember-text' : 'text-moss-text'}`}>
-          {guard
-            ? guard.rewritten
-              ? 'The model tried to phrase this as a guarantee — the deterministic guard rewrote it into honest estimate language before you saw it.'
-              : 'No guarantee language in this answer, and the estimate disclaimer is present.'
-            : 'No model explanation on this run — these results are deterministic output only.'}
+          {guard ? (guard.rewritten ? t.verifyGuardCaughtBody : t.verifyGuardCleanBody) : t.verifyGuardNoModelBody}
         </Text>
 
         <Pressable
@@ -173,23 +156,23 @@ export function VerificationPanel({
           onPress={runAdversarial}
           disabled={running}
           accessibilityRole="button"
-          accessibilityLabel="Run a test: try to make the model promise five thousand dollars"
+          accessibilityLabel={t.verifyRunTest}
         >
           {running ? (
             <ActivityIndicator color={T.surface} />
           ) : (
-            <Text className="font-bodybold text-body text-white">Run a test — try to make it promise $5,000</Text>
+            <Text className="font-bodybold text-body text-white">{t.verifyRunTest}</Text>
           )}
         </Pressable>
-        {error ? <Text className="mt-2 font-body text-caption text-ember-text">{error}</Text> : null}
+        {failed ? <Text className="mt-2 font-body text-caption text-ember-text">{t.verifyTestError}</Text> : null}
 
         {adv ? (
           <View className="mt-3" accessibilityLiveRegion="polite">
-            <Text className="font-bodybold text-caption uppercase tracking-wide text-ember-text">What the model tried to say</Text>
+            <Text className="font-bodybold text-caption uppercase tracking-wide text-ember-text">{t.verifyBefore}</Text>
             <View className="mt-1 rounded-card border border-ember bg-hearth-surface p-3">
               <Text className="font-body text-caption leading-5 text-ink">{adv.before}</Text>
             </View>
-            <Text className="mt-3 font-bodybold text-caption uppercase tracking-wide text-moss-text">What the guard let through</Text>
+            <Text className="mt-3 font-bodybold text-caption uppercase tracking-wide text-moss-text">{t.verifyAfter}</Text>
             <View className="mt-1 rounded-card border border-moss bg-hearth-surface p-3">
               <Text className="font-body text-caption leading-5 text-ink">{adv.after}</Text>
             </View>

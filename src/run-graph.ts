@@ -9,6 +9,7 @@ import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
 import { config } from './config.ts';
 import { makeAgentClient } from './gradient.ts';
 import { validateProfile } from './validate.ts';
+import { enforceNoGuarantee, DEFAULT_DISCLAIMER } from './guard.ts';
 import {
   SCREEN_FALLBACK_APPLY_URL,
   SCREEN_FALLBACK_CITATIONS,
@@ -86,7 +87,10 @@ export async function explainResults(
   results: ScreeningResult[],
 ): Promise<string> {
   const prompt = `The deterministic CalFresh screen already ran. Explain these ScreeningResult[] to the user in ${profile.preferredLanguage}. Include the disclaimer and every citation source_url from the results. Never invent dollar amounts or change screening outcomes.\n\n${JSON.stringify(results, null, 2)}`;
-  return invokeAgent(state.foodEndpoint, state.foodAgentKey, prompt);
+  const raw = await invokeAgent(state.foodEndpoint, state.foodAgentKey, prompt);
+  // Guard at the source: every consumer of explainResults/runGraph inherits the
+  // deterministic no-guarantee rewrite, not just the /chat path.
+  return enforceNoGuarantee(raw, results[0]?.disclaimer ?? DEFAULT_DISCLAIMER).text;
 }
 
 export async function runGraph(state: GraphState, text: string) {

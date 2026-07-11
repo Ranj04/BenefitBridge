@@ -14,6 +14,7 @@ export function WelcomeScreen({
   onStart,
   personas,
   onPersona,
+  busy,
 }: {
   t: Strings;
   lang: LangCode;
@@ -21,6 +22,7 @@ export function WelcomeScreen({
   onStart: () => void;
   personas: readonly Persona[];
   onPersona: (p: Persona) => void;
+  busy: boolean;
 }) {
   const trustCues = [t.trustFree, t.trustPrivate, t.trustNoAccount, t.trustNoStore];
   return (
@@ -73,7 +75,7 @@ export function WelcomeScreen({
 
         <Text className="mt-12 font-body text-caption text-ink-muted">{t.tryPersona}</Text>
         <View className="mt-3">
-          <SeedPersonaChips personas={personas} onPick={onPersona} />
+          <SeedPersonaChips personas={personas} onPick={onPersona} disabled={busy} />
         </View>
       </View>
     </View>

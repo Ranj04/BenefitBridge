@@ -1,5 +1,6 @@
 import { View, Text } from 'react-native';
 import type { ScreeningResult } from '../types';
+import type { Strings } from '../i18n';
 import { cardShadow } from '../theme/shadow';
 
 /**
@@ -7,15 +8,16 @@ import { cardShadow } from '../theme/shadow';
  * household may not know exist. Rendered as a rooted chain — the engine's
  * own reasons, one line each; nothing inferred in the UI.
  */
-export function CascadeList({ root, unlocked }: { root: ScreeningResult; unlocked: ScreeningResult[] }) {
+export function CascadeList({ t, root, unlocked }: { t: Strings; root: ScreeningResult; unlocked: ScreeningResult[] }) {
   return (
     <View className="mb-4 rounded-card bg-pine-soft p-5" style={cardShadow}>
       <Text className="font-display text-h3 text-ink" accessibilityRole="header">
-        One yes opens more doors
+        {t.cascadeTitle}
       </Text>
       <Text className="mt-1 font-body text-body text-ink">
-        Because this screening found you likely qualify for <Text className="font-bodybold">{root.program}</Text>, these programs come
-        with it:
+        {t.cascadeLead}
+        <Text className="font-bodybold">{root.program}</Text>
+        {t.cascadeTail}
       </Text>
       <View className="mt-4">
         {unlocked.map((r, i) => (

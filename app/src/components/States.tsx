@@ -52,19 +52,21 @@ export function ResultsSkeleton({ message }: { message: string }) {
 }
 
 /** Something went wrong: direction, not apology — and the user's info is safe. */
-export function ErrorState({ message, detail, retryLabel, onRetry }: { message: string; detail?: string; retryLabel: string; onRetry: () => void }) {
+export function ErrorState({ message, detail, retryLabel, onRetry }: { message: string; detail?: string; retryLabel?: string; onRetry?: () => void }) {
   return (
     <View className="rounded-card bg-hearth-surface p-6" style={cardShadow} accessibilityLiveRegion="assertive">
       <Text className="font-display text-h3 text-ink">{message}</Text>
       {detail ? <Text className="mt-2 font-body text-caption text-ink-muted">{detail}</Text> : null}
-      <Pressable
-        className="mt-4 min-h-[48px] items-center justify-center self-start rounded-full bg-pine px-6"
-        onPress={onRetry}
-        accessibilityRole="button"
-        accessibilityLabel={retryLabel}
-      >
-        <Text className="font-bodybold text-body text-white">{retryLabel}</Text>
-      </Pressable>
+      {retryLabel && onRetry ? (
+        <Pressable
+          className="mt-4 min-h-[48px] items-center justify-center self-start rounded-full bg-pine px-6"
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel={retryLabel}
+        >
+          <Text className="font-bodybold text-body text-white">{retryLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

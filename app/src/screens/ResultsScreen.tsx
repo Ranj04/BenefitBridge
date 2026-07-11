@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import type { ChatResponse, FilledApplication, AdversarialResult } from '../types';
 import type { Strings, LangCode } from '../i18n';
-import { bcp47For } from '../i18n';
+import { bcp47For, fieldLabel } from '../i18n';
 import type { useVoiceOutput } from '../hooks/useVoiceOutput';
 import { heroTotals, cascadeFrom } from '../lib/derive';
 import { cardShadow } from '../theme/shadow';
@@ -32,6 +32,7 @@ export function ResultsScreen({
   offlineAdversarial,
   offlineFilled,
   tts,
+  canRetry,
   onRetry,
   onEdit,
   onStartOver,
@@ -45,6 +46,7 @@ export function ResultsScreen({
   offlineAdversarial: AdversarialResult | null;
   offlineFilled: FilledApplication | null;
   tts: ReturnType<typeof useVoiceOutput>;
+  canRetry: boolean;
   onRetry: () => void;
   onEdit: () => void;
   onStartOver: () => void;
@@ -69,20 +71,21 @@ export function ResultsScreen({
       ) : error ? (
         <View className="mt-6">
           <ErrorState
-            message="We can’t run that screening just now."
+            message={t.errTitle}
             detail={error}
-            retryLabel="Try again"
-            onRetry={onRetry}
+            retryLabel={canRetry ? t.tryAgain : undefined}
+            onRetry={canRetry ? onRetry : undefined}
           />
         </View>
       ) : chat?.needMoreInfo ? (
         <View className="mt-6 rounded-card bg-hearth-surface p-6" style={cardShadow}>
           <Text className="font-display text-h3 text-ink" accessibilityRole="header">
-            We need a bit more to screen honestly
+            {t.needMoreTitle}
           </Text>
           <Text className="mt-2 font-body text-body leading-6 text-ink">
-            We never invent a number. Still missing: <Text className="font-bodybold">{chat.needMoreInfo.join(', ')}</Text>. Add that and
-            we’ll run the real math.
+            {t.needMoreLead}
+            <Text className="font-bodybold">{chat.needMoreInfo.map((k) => fieldLabel(lang, k)).join(', ')}</Text>
+            {t.needMoreTail}
           </Text>
           <Pressable
             className="mt-4 min-h-[48px] items-center justify-center self-start rounded-full bg-pine px-6"
@@ -108,7 +111,7 @@ export function ResultsScreen({
         />
       ) : (
         <View className="mt-6">
-          <EmptyState title="Nothing here yet" body={t.intakeHint} actionLabel={t.editAnswers} onAction={onEdit} />
+          <EmptyState title={t.emptyTitle} body={t.intakeHint} actionLabel={t.editAnswers} onAction={onEdit} />
         </View>
       )}
     </View>
@@ -154,12 +157,7 @@ function ResultsBody({
         {totals.likelyCount > 0 ? (
           <HeroAmount totals={totals} t={t} />
         ) : (
-          <EmptyState
-            title="No likely match from what you told us"
-            body="That can change with one detail — rent, childcare, or medical costs often tip the math. Add anything you left out and we’ll run it again."
-            actionLabel={t.editAnswers}
-            onAction={onEdit}
-          />
+          <EmptyState title={t.noLikelyTitle} body={t.noLikelyBody} actionLabel={t.editAnswers} onAction={onEdit} />
         )}
       </View>
 
@@ -173,7 +171,7 @@ function ResultsBody({
         <View className="mt-6 rounded-card bg-hearth-surface p-5" style={cardShadow}>
           <View className="flex-row flex-wrap items-center justify-between gap-2">
             <Text className="font-display text-h3 text-ink" accessibilityRole="header">
-              What this means for you
+              {t.explanationTitle}
             </Text>
             {tts.supported ? (
               <Pressable
@@ -196,7 +194,7 @@ function ResultsBody({
 
       {cascade ? (
         <View className="mt-6">
-          <CascadeList root={cascade.root} unlocked={cascade.unlocked} />
+          <CascadeList t={t} root={cascade.root} unlocked={cascade.unlocked} />
         </View>
       ) : null}
 
@@ -210,14 +208,16 @@ function ResultsBody({
         className="mb-4 mt-2 min-h-[48px] flex-row items-center justify-center gap-2 self-start rounded-full border-2 border-fog bg-hearth-surface px-5"
         onPress={() => setVerifyOpen((o) => !o)}
         accessibilityRole="button"
-        accessibilityLabel={`${verifyOpen ? 'Hide' : 'Show'} how we know — the full verification panel`}
+        accessibilityLabel={verifyOpen ? t.hideHow : t.seeHow}
         accessibilityState={{ expanded: verifyOpen }}
       >
-        <Text className="font-bodybold text-body text-ink">{verifyOpen ? 'Hide how we know ▴' : 'See how we know ▾'}</Text>
+        <Text className="font-bodybold text-body text-ink">{verifyOpen ? t.hideHow : t.seeHow}</Text>
       </Pressable>
 
       {verifyOpen && chat.profile ? (
         <VerificationPanel
+          t={t}
+          lang={lang}
           profile={chat.profile}
           results={results}
           guard={chat.guard}
@@ -226,12 +226,9 @@ function ResultsBody({
         />
       ) : null}
 
-      {calfreshLikely ? <FilerPanel profile={chat.profile!} offline={offline} offlineFilled={offlineFilled} /> : null}
+      {calfreshLikely ? <FilerPanel t={t} profile={chat.profile!} offline={offline} offlineFilled={offlineFilled} /> : null}
 
-      <DisclaimerNote className="mt-2">
-        Benefit amounts are set by the office that handles your case — bring your questions to them, and treat everything here as a
-        well-sourced head start, not a decision.
-      </DisclaimerNote>
+      <DisclaimerNote className="mt-2">{t.closingDisclaimer}</DisclaimerNote>
     </View>
   );
 }

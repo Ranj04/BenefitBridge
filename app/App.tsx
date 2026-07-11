@@ -327,16 +327,23 @@ export default function App() {
               offlineAdversarial={FIXTURE.adversarial}
               offlineFilled={FIXTURE.filled}
               tts={tts}
+              canRetry={!!lastRun && (!!lastRun.personaKey || !!lastRun.input.trim() || !!lastRun.profile)}
               onRetry={() => {
-                const persona = lastRun?.personaKey ? PERSONAS.find((candidate) => candidate.key === lastRun.personaKey) : null;
+                if (!lastRun) return;
+                const persona = lastRun.personaKey ? PERSONAS.find((candidate) => candidate.key === lastRun.personaKey) : null;
                 if (persona) pickPersona(persona);
-                else if (lastRun) void run(lastRun.input, null);
+                else if (lastRun.input.trim()) void run(lastRun.input, null);
+                // No intake text (e.g. a resumed session) — re-run the
+                // deterministic screen from the saved profile instead.
+                else if (lastRun.profile) void runScreen(lastRun.profile, null, '');
               }}
               onEdit={() => {
                 tts.stop();
                 setScreen('intake');
               }}
               onStartOver={() => {
+                runSeq.current++; // orphan any in-flight response
+                setBusy(false);
                 tts.stop();
                 setText('');
                 setChat(null);

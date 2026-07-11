@@ -33,13 +33,13 @@ export function ProgramCard({ r, t }: { r: ScreeningResult; t: Strings }) {
         <View className="mt-3 flex-row flex-wrap items-baseline gap-x-2">
           <Text className="font-displaybold text-h1 text-ink">{amountLabel(b)}</Text>
           <Text className="font-bodybold text-body text-ink-muted">
-            {b.period === 'monthly' ? t.perMonthLabel : b.period === 'annual' ? t.perYearLabel : 'one-time'}
+            {b.period === 'monthly' ? t.perMonthLabel : b.period === 'annual' ? t.perYearLabel : t.perOneTimeLabel}
           </Text>
         </View>
       ) : null}
       {annual ? (
         <View className="mt-2 self-start rounded-full border border-ember bg-ember-soft px-3 py-1.5">
-          <Text className="font-bodybold text-caption text-ember-text">Annual tax credit — one payment at tax time, not monthly</Text>
+          <Text className="font-bodybold text-caption text-ember-text">{t.annualChip}</Text>
         </View>
       ) : null}
 
@@ -50,10 +50,10 @@ export function ProgramCard({ r, t }: { r: ScreeningResult; t: Strings }) {
         className="mt-2 min-h-[48px] flex-row items-center gap-1 self-start"
         onPress={() => setOpen((o) => !o)}
         accessibilityRole="button"
-        accessibilityLabel={`${open ? 'Hide' : 'Show'} sources and next steps for ${r.program}`}
+        accessibilityLabel={`${open ? t.sourcesHide : t.sourcesShow} — ${r.program}`}
         accessibilityState={{ expanded: open }}
       >
-        <Text className="font-bodybold text-caption text-pine">{open ? 'Hide sources & next steps' : 'Sources & next steps'}</Text>
+        <Text className="font-bodybold text-caption text-pine">{open ? t.sourcesHide : t.sourcesShow}</Text>
         <Text className="font-bodybold text-caption text-pine" importantForAccessibility="no">
           {open ? '▴' : '▾'}
         </Text>
@@ -69,9 +69,9 @@ export function ProgramCard({ r, t }: { r: ScreeningResult; t: Strings }) {
               className="mt-2 min-h-[48px] items-center justify-center self-start rounded-full border-2 border-pine px-5"
               onPress={() => Linking.openURL(r.applyUrl)}
               accessibilityRole="link"
-              accessibilityLabel={`How to apply for ${r.program}`}
+              accessibilityLabel={`${t.howToApply} ${r.program}`}
             >
-              <Text className="font-bodybold text-body text-pine">How to apply →</Text>
+              <Text className="font-bodybold text-body text-pine">{t.howToApply}</Text>
             </Pressable>
           ) : null}
           <Text className="mt-3 font-body text-caption italic leading-5 text-ink-muted">{r.disclaimer}</Text>
