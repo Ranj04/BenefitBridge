@@ -4,6 +4,7 @@ import type { useVoiceInput } from '../hooks/useVoiceInput';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { SeedPersonaChips, type Persona } from '../components/SeedPersonaChips';
 import { IntakeInput } from '../components/IntakeInput';
+import { SaveToggle } from '../components/SaveToggle';
 
 /**
  * The conversation: one gentle prompt, one surface to answer in — spoken or
@@ -21,6 +22,8 @@ export function IntakeScreen({
   onBack,
   personas,
   onPersona,
+  saveEnabled,
+  onToggleSave,
 }: {
   t: Strings;
   lang: LangCode;
@@ -33,6 +36,8 @@ export function IntakeScreen({
   onBack: () => void;
   personas: readonly Persona[];
   onPersona: (p: Persona) => void;
+  saveEnabled: boolean;
+  onToggleSave: (on: boolean) => void;
 }) {
   return (
     <View className="w-full max-w-2xl self-center px-5 pb-12 pt-4">
@@ -51,6 +56,8 @@ export function IntakeScreen({
       <View className="mt-6">
         <IntakeInput value={text} onChange={onChangeText} onSubmit={onSubmit} voice={voice} busy={busy} t={t} />
       </View>
+
+      <SaveToggle t={t} enabled={saveEnabled} onToggle={onToggleSave} />
 
       <Text className="mt-10 font-body text-caption text-ink-muted">{t.tryPersona}</Text>
       <View className="mt-3 items-start">

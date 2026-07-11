@@ -56,8 +56,19 @@ export type Strings = {
   trustPrivate: string;
   trustNoAccount: string;
   trustNoStore: string;
+  /** Full honest privacy sentence (FTC §5: precise, not just reassuring). */
+  privacyLine: string;
   start: string;
   tryPersona: string;
+  // Save & resume (opt-in, on-device only)
+  saveProgress: string;
+  saveProgressNote: string;
+  resumeTitle: string;
+  resumeBody: string;
+  resume: string;
+  startFresh: string;
+  clearInfo: string;
+  clearConfirm: string;
   // Intake
   intakeTitle: string;
   intakeHint: string;
@@ -104,9 +115,19 @@ export const STRINGS: Record<LangCode, Strings> = {
     trustFree: 'Free',
     trustPrivate: 'Private',
     trustNoAccount: 'No account',
-    trustNoStore: "We don't store your information.",
+    trustNoStore: 'Never sent to our servers',
+    privacyLine:
+      "We never send your information to our servers. If you choose, we'll save your progress on this device only — clear it anytime.",
     start: 'Start',
     tryPersona: 'Just looking? Try an example household:',
+    saveProgress: 'Save my progress on this device',
+    saveProgressNote: 'Stays on this device only — never sent to us. Erased automatically after 7 days.',
+    resumeTitle: 'Resume where you left off?',
+    resumeBody: 'You chose to save your progress on this device. Pick it up, or start fresh — starting fresh erases it.',
+    resume: 'Resume',
+    startFresh: 'Start fresh',
+    clearInfo: 'Clear my information',
+    clearConfirm: 'Tap again to confirm',
     intakeTitle: 'Tell us about your home',
     intakeHint: "Say it the way you'd tell a friend — who lives with you, about what you earn each month, and what you pay in rent.",
     back: 'Back',
@@ -150,9 +171,19 @@ export const STRINGS: Record<LangCode, Strings> = {
     trustFree: 'Gratis',
     trustPrivate: 'Privado',
     trustNoAccount: 'Sin cuenta',
-    trustNoStore: 'No guardamos su información.',
+    trustNoStore: 'Nunca se envía a nuestros servidores',
+    privacyLine:
+      'Nunca enviamos su información a nuestros servidores. Si usted lo elige, guardamos su progreso solo en este dispositivo — bórrelo cuando quiera.',
     start: 'Comenzar',
     tryPersona: '¿Solo mirando? Pruebe un hogar de ejemplo:',
+    saveProgress: 'Guardar mi progreso en este dispositivo',
+    saveProgressNote: 'Se queda solo en este dispositivo — nunca se nos envía. Se borra automáticamente a los 7 días.',
+    resumeTitle: '¿Continuar donde lo dejó?',
+    resumeBody: 'Usted eligió guardar su progreso en este dispositivo. Retómelo, o empiece de cero — empezar de cero lo borra.',
+    resume: 'Continuar',
+    startFresh: 'Empezar de cero',
+    clearInfo: 'Borrar mi información',
+    clearConfirm: 'Toque de nuevo para confirmar',
     intakeTitle: 'Cuéntenos sobre su hogar',
     intakeHint: 'Dígalo como se lo contaría a una amistad — quién vive con usted, cuánto gana al mes y cuánto paga de alquiler.',
     back: 'Atrás',
@@ -196,9 +227,18 @@ export const STRINGS: Record<LangCode, Strings> = {
     trustFree: '免费',
     trustPrivate: '保密',
     trustNoAccount: '无需注册',
-    trustNoStore: '我们不保存您的信息。',
+    trustNoStore: '绝不发送到我们的服务器',
+    privacyLine: '我们绝不会把您的信息发送到我们的服务器。如果您选择保存，进度只保存在此设备上 — 随时可以清除。',
     start: '开始',
     tryPersona: '先看看？试试示例家庭：',
+    saveProgress: '在此设备上保存我的进度',
+    saveProgressNote: '只保存在此设备上 — 绝不发送给我们。7 天后自动删除。',
+    resumeTitle: '从上次离开的地方继续？',
+    resumeBody: '您选择了在此设备上保存进度。可以继续，或从头开始 — 从头开始会删除已保存的内容。',
+    resume: '继续',
+    startFresh: '从头开始',
+    clearInfo: '清除我的信息',
+    clearConfirm: '再点一次确认',
     intakeTitle: '告诉我们您的家庭情况',
     intakeHint: '像跟朋友聊天一样说就行 — 谁和您一起住、每月大约收入多少、房租多少。',
     back: '返回',

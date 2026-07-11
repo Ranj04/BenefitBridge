@@ -59,6 +59,9 @@ export function WelcomeScreen({
           ))}
         </View>
 
+        {/* The precise version of the promise (FTC §5): never sent to us; saving is the user's opt-in choice, on-device, clearable. */}
+        <Text className="mt-3 max-w-md text-center font-body text-caption leading-5 text-ink-muted">{t.privacyLine}</Text>
+
         <Pressable
           className="mt-10 min-h-[56px] w-full max-w-xs items-center justify-center rounded-full bg-pine px-8"
           onPress={onStart}
