@@ -11,15 +11,16 @@
     "provision": "tsx scripts/provision.ts",
     "resources:list": "tsx scripts/list-resources.ts",
     "verify:a1": "tsx scripts/verify-a1.ts",
-    "verify:guardrail": "tsx scripts/verify-guardrail.ts"
+    "verify:guardrail": "tsx scripts/verify-guardrail.ts",
+    "start": "tsx src/server.ts"
   },
   "dependencies": {
     "@digitalocean/gradient": "^0.1.0-alpha.2",
-    "fastify": "^4.29.1"
+    "fastify": "^4.29.1",
+    "tsx": "^4.23.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "tsx": "^4.23.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
