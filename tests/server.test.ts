@@ -1,6 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { buildServer } from '../src/server.ts';
 import { validateScreeningResult } from '../src/validate.ts';
+import { resetDataCache } from '../src/data/runtime.ts';
+
+// No live network in unit tests: force the data layer onto its last-good
+// store fallback (data/constants.json) so /screen is fast and deterministic.
+beforeAll(() => {
+  resetDataCache();
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network disabled in tests'); }));
+});
+afterAll(() => vi.unstubAllGlobals());
 
 const valid = {
   householdSize: 2,
