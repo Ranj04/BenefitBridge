@@ -1,0 +1,9 @@
+.rocketride/
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.gradient-state.json
+guardrail-capture.json
+do-function/.env

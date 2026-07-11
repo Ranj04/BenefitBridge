@@ -1,0 +1,24 @@
+{
+  "name": "benefitbridge-gradient-graph",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Person A — DigitalOcean Gradient AI agent graph for BenefitBridge (Hearth)",
+  "scripts": {
+    "mock": "tsx src/mock-screen.ts",
+    "provision": "tsx scripts/provision.ts",
+    "resources:list": "tsx scripts/list-resources.ts",
+    "verify:a1": "tsx scripts/verify-a1.ts",
+    "verify:guardrail": "tsx scripts/verify-guardrail.ts"
+  },
+  "dependencies": {
+    "@digitalocean/gradient": "^0.1.0-alpha.2",
+    "fastify": "^4.29.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
