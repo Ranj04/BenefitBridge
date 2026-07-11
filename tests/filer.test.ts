@@ -117,9 +117,13 @@ describe('THE FILER BOUNDARY — the system never submits', () => {
         if (statSync(p).isDirectory()) walk(p);
         else if (p.endsWith('.ts')) {
           const src = readFileSync(p, 'utf8');
-          const code = src.replace(/^\s*(\/\/|\*|\/\*\*?).*$/gm, ''); // strip comments (citation URLs live there)
-          const govFetch = /fetch\([^)]*\.gov/.test(code) || (/['"`][^'"`]*\.gov[^'"`]*['"`]/.test(code) && /method:\s*['"]POST['"]/i.test(code));
-          if (govFetch && /method:\s*['"]POST['"]/i.test(code)) offenders.push(p);
+          // Inspect each fetch() call site: offender only if THAT call both
+          // targets a .gov host and sends a POST. Citation string literals
+          // elsewhere in the file must not trip the scan.
+          for (const m of src.matchAll(/fetch\(/g)) {
+            const window = src.slice(m.index!, m.index! + 400);
+            if (/\.gov/.test(window.split(')')[0] ?? '') && /method:\s*['"]POST['"]/i.test(window)) offenders.push(p);
+          }
         }
       }
     };
