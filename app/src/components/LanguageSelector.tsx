@@ -1,7 +1,6 @@
-// T1 — language control for the intake screen (EN / ES / ZH).
-// Sets SpeechRecognition.lang + the TTS voice, and is passed through to the
-// intake agent as preferredLanguage. Keyboard-operable (Pressable → <button>
-// on web) with radio semantics for screen readers.
+// Language control (EN / ES / ZH). Sets SpeechRecognition.lang + the TTS
+// voice, and is passed through to the intake agent as preferredLanguage.
+// Keyboard-operable (Pressable → <button> on web) with radio semantics.
 import { View, Text, Pressable } from 'react-native';
 import { LANGUAGES, STRINGS, type LangCode } from '../i18n';
 
@@ -13,13 +12,14 @@ export function LanguageSelector({ value, onChange }: { value: LangCode; onChang
         return (
           <Pressable
             key={l.code}
-            className={`rounded-full border px-3 py-1 ${selected ? 'border-brand bg-brand' : 'border-indigo-300 bg-transparent'}`}
+            className={`min-h-[48px] justify-center rounded-full border px-4 ${selected ? 'border-pine bg-pine' : 'border-fog bg-hearth-surface'}`}
             onPress={() => onChange(l.code)}
             accessibilityRole="radio"
             accessibilityState={{ checked: selected }}
+            aria-checked={selected}
             accessibilityLabel={l.a11yLabel}
           >
-            <Text className={`text-xs font-bold ${selected ? 'text-white' : 'text-indigo-100'}`}>{l.label}</Text>
+            <Text className={`font-bodybold text-caption ${selected ? 'text-white' : 'text-ink'}`}>{l.label}</Text>
           </Pressable>
         );
       })}

@@ -45,6 +45,8 @@ async function newPage(browser, { withASR }) {
   else await ctx.addInitScript(`delete window.SpeechRecognition; delete window.webkitSpeechRecognition;`);
   const page = await ctx.newPage();
   await page.goto(APP, { waitUntil: 'networkidle' });
+  // The design-system flow opens on the Welcome screen; intake is behind Start.
+  await page.getByRole('button', { name: /^(Start|Comenzar|\u5f00\u59cb)$/ }).click({ timeout: 60000 });
   await page.waitForSelector('textarea', { timeout: 60000 });
   return { ctx, page };
 }
@@ -57,7 +59,7 @@ const browser = await chromium.launch();
   const micCount = await page.getByLabel(/Speak instead of typing|Stop listening/).count();
   const crashed = await page.evaluate(() => document.body.innerText.length < 50);
   await page.locator('textarea').fill('single mom in SF, about $2,800 a month, one kid, renting for $1,800');
-  await page.getByLabel('Check my benefits').click();
+  await page.getByLabel(/See what I qualify for|Ver para qu\u00e9 califico/).click();
   const gotResult = await page
     .waitForSelector('text=/CalFresh/', { timeout: 120000 })
     .then(() => true)
@@ -80,7 +82,7 @@ const browser = await chromium.launch();
   const fieldOk = fieldValue.includes('$2,800') && fieldValue.includes('one kid');
   // Nothing auto-submitted: still no results on screen.
   const preSubmit = await page.locator('text=/likely|CalFresh/i').count();
-  await page.getByLabel('Check my benefits').click();
+  await page.getByLabel(/See what I qualify for|Ver para qu\u00e9 califico/).click();
   await page.waitForSelector('text=/CalFresh/', { timeout: 120000 });
   const profileOk = await page
     .waitForSelector('text=/estimate/i', { timeout: 10000 })
@@ -106,7 +108,7 @@ const browser = await chromium.launch();
   await page.evaluate(() => window.__emit('Soy madre soltera en San Francisco, gano como $2,800 al mes, tengo un hijo y pago renta de $1,800', true));
   await page.getByLabel(/Dejar de escuchar/).click();
   const fieldValue = await page.locator('textarea').inputValue();
-  await page.getByLabel('Check my benefits').click();
+  await page.getByLabel(/See what I qualify for|Ver para qu\u00e9 califico/).click();
   await page.waitForSelector('text=/CalFresh/', { timeout: 120000 });
   const bodyText = await page.evaluate(() => document.body.innerText);
   const spanishResponse = /califiques|calificar|beneficio|hogar/i.test(bodyText);
