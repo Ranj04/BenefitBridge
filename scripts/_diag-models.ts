@@ -1,4 +1,4 @@
-/** TEMP diagnostic — switch Food agent to GPT-5.2 to test function-route execution. */
+/** TEMP diagnostic — inspect the Food agent's registered functions + deployment. */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { makeClient } from '../src/gradient.ts';
@@ -7,14 +7,14 @@ const state = JSON.parse(readFileSync(fileURLToPath(new URL('../.gradient-state.
 
 async function main() {
   const client = makeClient();
-  const res: any = await client.models.list();
-  const models: any[] = res?.models ?? [];
-  const gpt = models.find((m) => /^OpenAI GPT-5\.2$/i.test(m.name));
-  if (!gpt) throw new Error('GPT-5.2 not found');
-  console.log(`Switching Food agent ${state.foodAgentUuid} → ${gpt.name} [${gpt.uuid}]`);
-  await client.agents.update(state.foodAgentUuid, { model_uuid: gpt.uuid });
-  console.log('Updated. Waiting 20s for deployment...');
-  await new Promise((r) => setTimeout(r, 20000));
-  console.log('done');
+  const a: any = await client.agents.retrieve(state.foodAgentUuid);
+  const agent = a?.agent ?? a;
+  console.log('model:', agent?.model?.name);
+  console.log('deployment status:', agent?.deployment?.status ?? agent?.deployment?.visibility);
+  const fns = agent?.functions ?? [];
+  console.log('functions count:', fns.length);
+  console.log(JSON.stringify(fns, null, 2).slice(0, 2500));
+  const kbs = agent?.knowledge_bases ?? [];
+  console.log('KBs:', kbs.map((k: any) => k.name ?? k.uuid));
 }
 main().catch((e) => console.error('[diag] fatal', e?.error?.message ?? e?.message ?? e));
