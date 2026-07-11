@@ -23,11 +23,18 @@ export type ChatResponse = {
   agentLayer: 'live' | 'unconfigured';
 };
 
-const TIMEOUT_MS = 90_000;
+// Bound each agent call so the two sequential calls stay well under the DO App
+// Platform gateway request timeout (~60s) — otherwise a slow agent turns into a
+// 504 HTML page at the gateway before Fastify can reply. Intake is load-bearing
+// (no profile without it); the food-agent EXPLANATION is optional prose over
+// numbers the deterministic engine already produced, so it gets a tight budget
+// and degrades to a templated explanation on timeout.
+const INTAKE_TIMEOUT_MS = 30_000;
+const FOOD_TIMEOUT_MS = 15_000;
 
-async function chatCompletion(baseUrl: string, key: string, content: string): Promise<string> {
+async function chatCompletion(baseUrl: string, key: string, content: string, timeoutMs: number): Promise<string> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(`${baseUrl.replace(/\/$/, '')}/api/v1/chat/completions`, {
       method: 'POST',
@@ -125,7 +132,7 @@ export async function runChat(
     return { profile: null, results: null, explanation: null, guard: null, needMoreInfo: null, agentLayer: 'unconfigured' };
   }
 
-  const intakeRaw = await chatCompletion(cfg.intake.url, cfg.intake.key, freeText);
+  const intakeRaw = await chatCompletion(cfg.intake.url, cfg.intake.key, freeText, INTAKE_TIMEOUT_MS);
   const parsed = parseProfileJson(intakeRaw);
   const v = validateProfile(parsed);
   if (!v.ok) throw new Error(`intake produced an invalid profile: ${v.errors.join('; ')}`);
@@ -138,16 +145,43 @@ export async function runChat(
   const results = await screenAll(completed.profile);
   for (const r of results) r.assumptions.unshift(...completed.assumptions);
 
+  const calfresh = results.find((r) => r.program === 'CalFresh') ?? results[0];
   let explanation: string | null = null;
   let guard: ChatResponse['guard'] = null;
   if (cfg.food) {
-    const calfresh = results.find((r) => r.program === 'CalFresh') ?? results[0];
     const prompt = `HouseholdProfile:\n${JSON.stringify(completed.profile)}\n\nScreeningResult (from the deterministic engine):\n${JSON.stringify(calfresh)}\n\nExplain this result to the user in their preferred language (${completed.profile.preferredLanguage}).`;
-    const raw = await chatCompletion(cfg.food.url, cfg.food.key, prompt);
-    const guarded = enforceNoGuarantee(raw, calfresh.disclaimer);
-    explanation = guarded.text;
-    guard = { rewritten: guarded.rewritten, disclaimerAppended: guarded.disclaimerAppended };
+    try {
+      // Best-effort prose: on timeout/error we still return the real numbers with
+      // a deterministic explanation, so /chat never hangs into a gateway 504.
+      const raw = await chatCompletion(cfg.food.url, cfg.food.key, prompt, FOOD_TIMEOUT_MS);
+      const guarded = enforceNoGuarantee(raw, calfresh.disclaimer);
+      explanation = guarded.text;
+      guard = { rewritten: guarded.rewritten, disclaimerAppended: guarded.disclaimerAppended };
+    } catch {
+      explanation = deterministicExplanation(results, calfresh.disclaimer);
+    }
+  } else {
+    explanation = deterministicExplanation(results, calfresh.disclaimer);
   }
 
   return { profile: parsed, results, explanation, guard, needMoreInfo: null, agentLayer: 'live' };
+}
+
+/**
+ * Fallback explanation built purely from the deterministic results — used when
+ * the food agent is unconfigured or too slow. Numbers only ever come from the
+ * engine; this just narrates them. Still labeled as an estimate.
+ */
+export function deterministicExplanation(results: ScreeningResult[], disclaimer: string): string {
+  const money = (b: ScreeningResult['estimatedBenefit']): string => {
+    if (!b) return '';
+    const amt = typeof b.amount === 'number' ? `$${b.amount}` : `$${b.amount.low}–$${b.amount.high}`;
+    return ` (est. ${amt}/${b.period === 'annual' ? 'year' : b.period === 'one_time' ? 'one-time' : 'month'})`;
+  };
+  const lines = results.map((r) => {
+    const label =
+      r.screening === 'likely_qualify' ? 'likely qualifies' : r.screening === 'unlikely' ? 'unlikely to qualify' : 'needs more info';
+    return `• ${r.program}: ${label}${money(r.estimatedBenefit)}`;
+  });
+  return `Here's what your answers suggest:\n${lines.join('\n')}\n\n${disclaimer}`;
 }
