@@ -9,7 +9,11 @@
  *    screening: 'need_more_info' — the engine never silently invents a value.
  */
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
+import { randomUUID, createHash } from 'node:crypto';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import type { HouseholdProfile, ScreeningResult, FilledApplication } from './contracts.ts';
+import { fillCf285 } from './filer/fillCf285.ts';
 import { validateProfile } from './validate.ts';
 import { screenCalfresh } from './programs/calfresh.ts';
 import { screenMediCal } from './programs/medical.ts';
@@ -65,6 +69,41 @@ export function buildServer(): FastifyInstance {
 
     const results: ScreeningResult[] = [calfresh, mediCal, care, lifeline, ...eitc];
     return reply.send(results);
+  });
+
+  // Prompt 4 — the filer. Prepares a review-ready filled CF 285; the HUMAN
+  // submits. No code path here (or anywhere) POSTs to a government endpoint.
+  const GENERATED_DIR = fileURLToPath(new URL('../generated/', import.meta.url));
+  app.post('/fill', async (req, reply) => {
+    const body = req.body as { profile?: HouseholdProfile; program?: string };
+    if (!body?.profile || (body.program ?? 'CalFresh') !== 'CalFresh') {
+      return reply.code(400).send({ error: "body must be { profile, program: 'CalFresh' }" });
+    }
+    const v = validateProfile(body.profile);
+    if (!v.ok) return reply.code(400).send({ error: 'Invalid HouseholdProfile', details: v.errors });
+
+    const { pdf, app: partial } = await fillCf285(body.profile);
+    // PII care: random, unguessable file name; nothing about the household in it.
+    const name = `cf285-${randomUUID()}.pdf`;
+    await mkdir(GENERATED_DIR, { recursive: true });
+    await writeFile(`${GENERATED_DIR}${name}`, pdf);
+    // Audit trail stores a hash of the artifact, not its contents.
+    app.log.info({ action: 'fill', program: 'CalFresh', sha256: createHash('sha256').update(pdf).digest('hex').slice(0, 16) });
+
+    const base = `${req.protocol}://${req.headers.host}`;
+    const result: FilledApplication = { ...partial, pdfUrl: `${base}/files/${name}` };
+    return result;
+  });
+
+  app.get('/files/:name', async (req, reply) => {
+    const { name } = req.params as { name: string };
+    if (!/^cf285-[0-9a-f-]{36}\.pdf$/.test(name)) return reply.code(404).send({ error: 'not found' });
+    try {
+      const bytes = await readFile(`${GENERATED_DIR}${name}`);
+      return reply.header('content-type', 'application/pdf').send(bytes);
+    } catch {
+      return reply.code(404).send({ error: 'not found' });
+    }
   });
 
   app.get('/health', async () => ({ ok: true, engine: 'benefitbridge-screen', mock: false }));
