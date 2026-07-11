@@ -20,13 +20,42 @@ import { fileURLToPath } from 'node:url';
 import { makeClient, pickUuid } from '../src/gradient.ts';
 import { config, resolveProjectId, RESOURCE_NAMES } from '../src/config.ts';
 import { INTAKE_INSTRUCTION, FOOD_INSTRUCTION, ROUTER_INSTRUCTION } from '../src/prompts.ts';
-import { HouseholdProfileJsonSchema, ScreeningResultArrayJsonSchema } from '../src/schemas.ts';
+import { HouseholdProfileJsonSchema } from '../src/schemas.ts';
 
 const STATE_PATH = resolve(fileURLToPath(new URL('../.gradient-state.json', import.meta.url)));
 const client = makeClient();
 
 type State = Record<string, string>;
 const state: State = {};
+
+/**
+ * DO's function-route API rejects raw JSON Schema ("parameters field is required"):
+ * it wants { parameters: [{ name, in, schema, required, description }] } for input
+ * and { properties: [{ name, type, description }] } for output.
+ */
+function toDoFunctionInputSchema(schema: typeof HouseholdProfileJsonSchema) {
+  const required = new Set<string>(schema.required as readonly string[]);
+  return {
+    parameters: Object.entries(schema.properties).map(([name, prop]: [string, any]) => ({
+      name,
+      in: 'query',
+      schema: { type: Array.isArray(prop.type) ? prop.type[0] : prop.type },
+      required: required.has(name),
+      description: prop.enum ? `One of: ${prop.enum.join(', ')}` : `HouseholdProfile.${name}`,
+    })),
+  };
+}
+
+const DO_SCREEN_OUTPUT_SCHEMA = {
+  properties: [
+    {
+      name: 'body',
+      type: 'array',
+      description:
+        'ScreeningResult[] — per program: screening (likely_qualify | need_more_info | unlikely), estimatedBenefit {amount, period}, computation, assumptions, reason, citations (source_url, as_of), applyUrl, disclaimer. These are the ONLY eligibility outcomes and dollar figures you may state.',
+    },
+  ],
+};
 
 async function findAgentByName(name: string): Promise<any | undefined> {
   const res: any = await client.agents.list();
@@ -195,8 +224,8 @@ async function main() {
         description: 'Deterministic CalFresh screen. Input: HouseholdProfile. Output: ScreeningResult[]. The ONLY source of eligibility outcomes and dollar amounts.',
         faas_namespace: faasNamespace,
         faas_name: faasName,
-        input_schema: HouseholdProfileJsonSchema,
-        output_schema: ScreeningResultArrayJsonSchema,
+        input_schema: toDoFunctionInputSchema(HouseholdProfileJsonSchema),
+        output_schema: DO_SCREEN_OUTPUT_SCHEMA,
       });
       console.log(`+ registered function route "${RESOURCE_NAMES.screenFunction}" on Food agent`);
       state.functionRoute = `${faasNamespace}/${faasName}`;
