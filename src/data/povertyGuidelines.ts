@@ -36,13 +36,16 @@ async function getRaw(year: number, state: FplState, size: number): Promise<numb
     });
     if (!res.ok) throw new Error(`ASPE API ${res.status} for ${url}`);
     const json = (await res.json()) as {
-      data?: { poverty_threshold?: number };
+      data?: { poverty_threshold?: number | string; income?: number | string };
       status?: number;
     };
-    const val = json?.data?.poverty_threshold;
+    // Live 2026 API returns { data: { income: "44360" } } (string); older docs
+    // describe { data: { poverty_threshold: <number> } }. Accept both, strictly.
+    const raw = json?.data?.income ?? json?.data?.poverty_threshold;
+    const val = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : raw;
     if (typeof val !== "number" || !Number.isFinite(val) || val <= 0) {
       throw new Error(
-        `ASPE API returned no valid poverty_threshold for ${url}: ${JSON.stringify(json)}`
+        `ASPE API returned no valid income/poverty_threshold for ${url}: ${JSON.stringify(json)}`
       );
     }
     return Math.round(val); // whole dollars
