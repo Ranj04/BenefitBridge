@@ -54,13 +54,31 @@ function normalize(rawAmount: string, kSuffix: string | undefined, period: strin
 }
 
 /**
+ * Amounts that belong to another anchor are not income. "my rent is 1.3k a
+ * month and i make 6k a month" must never read 1300 as the wage — blank the
+ * rent/utility-anchored amounts (preserving length) before the income scan.
+ */
+function maskNonIncomeAmounts(text: string): string {
+  return text
+    .replace(
+      /\b(rent|rents|renting|lease|utilities|utility)\b([^.!?\n]{0,15}?)(\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:k|thousand)?)/gi,
+      (_m, a: string, b: string, c: string) => a + b + ' '.repeat(c.length),
+    )
+    .replace(
+      /(\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:k|thousand)?)([^.!?\n]{0,15}?\b(?:rent|lease)\b)/gi,
+      (_m, a: string, b: string) => ' '.repeat(a.length) + b,
+    );
+}
+
+/**
  * Income. Requires an explicit amount. A stated period is normalized to monthly;
  * an amount with no period is only accepted when it is unambiguously a wage
  * figure (an earning verb, and small enough that it cannot be an annual salary) —
  * otherwise we would be guessing between $3,000/mo and $3,000/yr, and we do not
  * guess.
  */
-export function extractMonthlyIncome(text: string): number | null {
+export function extractMonthlyIncome(rawText: string): number | null {
+  const text = maskNonIncomeAmounts(rawText);
   // "3k month", "$2,800 a month", "650 a week", "40k/yr", "$45,000 per year"
   const forward = text.match(
     new RegExp(`${AMOUNT}\\s*(?:dollars?|bucks|usd)?\\s*(?:\\/|\\s*(?:a|an|per|each|every)\\s+|\\s+)${PERIOD}\\b`, 'i'),
@@ -205,18 +223,41 @@ export function extractHouseholdSize(text: string): number | null {
     if (n != null && n >= 1 && n <= 19) return n + 1;
   }
 
+  // 2b. "single dad … 3 kids" without an "of": the count may sit across a comma
+  //     or a relative clause ("with 3 kids who live with me"). Only when nobody
+  //     else is named in the span — "single mom, my sister has two kids" must
+  //     not count the sister's children into this household.
+  const soloKids = t.match(
+    new RegExp(`\\b(?:single|solo)\\s+(?:mom|mother|mum|dad|father|parent)\\b([^.!?\\n]{0,40}?)\\b${COUNT}\\s+(?:kids?|children|child)\\b`, 'i'),
+  );
+  if (soloKids && !new RegExp(PERSON, 'i').test(soloKids[1]!)) {
+    const n = countFrom(soloKids[2]!);
+    if (n != null && n >= 1 && n <= 19) return n + 1;
+  }
+
   // 3. A roster introduced by who they live with / support / have.
   //    "i live with 3 kids and myself", "raising 2 kids", "i have 3 kids", "single dad with 2 kids"
-  const anchored =
-    t.match(/\b(?:(?:live|living|lives|stay|staying|reside|residing)\s+(?:with|w\/)|raising|supporting|caring\s+for|looking\s+after|taking\s+care\s+of)\s+([^]*)/i) ??
-    t.match(/\b(?:i\s+have|i've\s+got|ive\s+got|i\s+got|we\s+have|there(?:'s| is| are)|it'?s)\s+([^]*)/i) ??
-    t.match(/\b(?:single\s+(?:dad|mom|mum|mother|father|parent)|widow(?:er)?)\b[^.!?\n]{0,30}?\bwith\s+([^]*)/i);
-  if (anchored) {
-    const scan = scanPeople(clauseFrom(anchored[1]!));
-    if (scan.ambiguous) return null; // they named people but not how many
+  //    Every anchor is tried: the first to yield an actual count wins. A regex
+  //    match whose clause names nobody countable ("…who live with ME…") must not
+  //    shadow a later anchor that has the real roster.
+  const ANCHORS = [
+    /\b(?:(?:live|living|lives|stay|staying|reside|residing)\s+(?:with|w\/)|raising|supporting|caring\s+for|looking\s+after|taking\s+care\s+of)\s+([^]*)/i,
+    /\b(?:i\s+have|i've\s+got|ive\s+got|i\s+got|we\s+have|there(?:'s| is| are)|it'?s)\s+([^]*)/i,
+    /\b(?:single\s+(?:dad|mom|mum|mother|father|parent)|widow(?:er)?)\b[^.!?\n]{0,30}?\bwith\s+([^]*)/i,
+  ];
+  let sawAmbiguous = false;
+  for (const anchor of ANCHORS) {
+    const m = t.match(anchor);
+    if (!m) continue;
+    const scan = scanPeople(clauseFrom(m[1]!));
+    if (scan.ambiguous) {
+      sawAmbiguous = true; // they named people but not how many — a question, unless another anchor has the count
+      continue;
+    }
     const n = totalFrom(scan, true);
     if (n != null) return n;
   }
+  if (sawAmbiguous) return null;
 
   // 4. A bare roster: a coordinated list of people, with or without the speaker in it.
   //    "me, my wife, and our three kids" / "my husband and me" / "2 adults and 3 children"

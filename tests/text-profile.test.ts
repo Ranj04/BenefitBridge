@@ -63,6 +63,31 @@ describe('extractHouseholdSize', () => {
     expect(extractHouseholdSize('i live with my mom and my 2 kids')).toBe(4);
   });
 
+  it('the count survives a relative clause — "3 kids who live with me" (live bug)', () => {
+    // The exact sentence a real user typed: the "who live with me" clause used to
+    // shadow the "single dad with 3 kids" roster and force a needMoreInfo.
+    const text =
+      'I am a single dad with 3 kids who live with me in my apartment, my rent is 1.3k a month and i make 6k a month in San Francisco';
+    expect(extractHouseholdSize(text)).toBe(4);
+    const p = extractProfileFromText(text);
+    expect(p.monthlyGrossIncome).toBe(6000);
+    expect(p.monthlyRent).toBe(1300);
+    expect(p.hasChildren).toBe(true);
+    expect(p.isRenter).toBe(true);
+  });
+
+  it('reads the seed-persona comma form — "single mom …, one kid"', () => {
+    expect(extractHouseholdSize("I'm a single mom in SF, I make about $2,800 a month, one kid, renting for $1,800")).toBe(2);
+  });
+
+  it('never counts someone else\'s kids into this household', () => {
+    expect(extractHouseholdSize('single mom, my sister has two kids')).toBeNull();
+  });
+
+  it('an uncounted plural still asks instead of guessing', () => {
+    expect(extractHouseholdSize('i live with my kids')).toBeNull();
+  });
+
   it('does not let a run-on sentence pull in people who are not in the household', () => {
     // No period after the roster; the next clause must not be counted.
     expect(extractHouseholdSize('i live with my 2 kids i need to call my mom about it')).toBe(3);
