@@ -228,10 +228,10 @@ async function main() {
         output_schema: DO_SCREEN_OUTPUT_SCHEMA,
       });
       console.log(`+ registered function route "${RESOURCE_NAMES.screenFunction}" on Food agent`);
-      state.functionRoute = `${faasNamespace}/${faasName}`;
     } catch (e: any) {
-      console.warn(`  [warn] function route create failed: ${e.message}`);
+      console.warn(`  [warn] function route create failed (may already exist): ${e.message}`);
     }
+    state.functionRoute = `${faasNamespace}/${faasName}`;
   } else {
     console.warn(
       `  [SKIP + FLAG] Function route not registered: set FAAS_NAMESPACE + FAAS_NAME to the deployed do-function/ proxy (see README-personA.md §Function route). The proxy forwards to SCREEN_URL=${config.screenUrl}.`,
