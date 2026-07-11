@@ -18,7 +18,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeClient, pickUuid } from '../src/gradient.ts';
-import { config, RESOURCE_NAMES } from '../src/config.ts';
+import { config, resolveProjectId, RESOURCE_NAMES } from '../src/config.ts';
 import { INTAKE_INSTRUCTION, FOOD_INSTRUCTION, ROUTER_INSTRUCTION } from '../src/prompts.ts';
 import { HouseholdProfileJsonSchema, ScreeningResultArrayJsonSchema } from '../src/schemas.ts';
 
@@ -41,16 +41,30 @@ async function findKbByName(name: string): Promise<any | undefined> {
 async function pickModels() {
   const res: any = await client.models.list();
   const models: any[] = res?.models ?? [];
-  const claude = models.find((m) => /claude/i.test(m.name) && m.is_foundational !== false);
-  const embed = models.find(
+  const claudeCandidates = models.filter((m) => /claude/i.test(m.name) && m.is_foundational !== false);
+  const claude =
+    claudeCandidates.find((m) => /sonnet 4(?!\.)/i.test(m.name)) ??
+    claudeCandidates.find((m) => /sonnet 3\.5/i.test(m.name)) ??
+    claudeCandidates.find((m) => /haiku/i.test(m.name)) ??
+    claudeCandidates[0];
+  const embedCandidates = models.filter(
     (m) => /embed/i.test(m.name) || (m.usecases ?? []).some((u: string) => /embed/i.test(u)),
   );
+  const embed =
+    embedCandidates.find((m) => /gte large|e5 large|bge m3|multi qa mpnet/i.test(m.name)) ??
+    embedCandidates[0];
   if (!claude) throw new Error('No Claude foundation model found on this account — enable one in Gradient, or edit pickModels().');
   if (!embed) console.warn('[warn] No embedding model auto-detected; KB may need embedding_model_uuid set manually.');
   return { modelUuid: claude.uuid as string, embedUuid: embed?.uuid as string | undefined };
 }
 
-async function ensureAgent(name: string, instruction: string, modelUuid: string, kbUuids: string[] = []) {
+async function ensureAgent(
+  name: string,
+  instruction: string,
+  modelUuid: string,
+  projectId: string,
+  kbUuids: string[] = [],
+) {
   const existing = await findAgentByName(name);
   if (existing) {
     console.log(`= agent "${name}" exists [${existing.uuid}] — updating instruction`);
@@ -62,7 +76,7 @@ async function ensureAgent(name: string, instruction: string, modelUuid: string,
     instruction,
     model_uuid: modelUuid,
     region: config.region,
-    project_id: config.projectId,
+    project_id: projectId,
     knowledge_base_uuid: kbUuids.length ? kbUuids : undefined,
   });
   const uuid = pickUuid(created)!;
@@ -71,6 +85,14 @@ async function ensureAgent(name: string, instruction: string, modelUuid: string,
 }
 
 async function main() {
+  const projectId = (await resolveProjectId()) ?? config.projectId;
+  if (!projectId) {
+    throw new Error(
+      'Could not resolve DO project id. Set DO_PROJECT_ID in .env (DigitalOcean → Projects → copy id from URL).',
+    );
+  }
+  console.log(`Using project ${projectId}, region ${config.region}`);
+
   const { modelUuid, embedUuid } = await pickModels();
   console.log(`Using model ${modelUuid}${embedUuid ? `, embedding ${embedUuid}` : ''}\n`);
 
@@ -80,7 +102,7 @@ async function main() {
     const createdKb: any = await client.knowledgeBases.create({
       name: RESOURCE_NAMES.foodKB,
       region: config.region,
-      project_id: config.projectId,
+      project_id: projectId,
       embedding_model_uuid: embedUuid,
       datasources: [
         { web_crawler_data_source: { base_url: 'https://www.sfhsa.org/services/health-food/calfresh', crawling_option: 'DOMAIN' } },
@@ -103,10 +125,10 @@ async function main() {
   }
 
   // --- A1.1 Intake agent ---
-  state.intakeAgentUuid = await ensureAgent(RESOURCE_NAMES.intakeAgent, INTAKE_INSTRUCTION, modelUuid);
+  state.intakeAgentUuid = await ensureAgent(RESOURCE_NAMES.intakeAgent, INTAKE_INSTRUCTION, modelUuid, projectId);
 
   // --- A1.3 Food domain agent (KB attached) ---
-  state.foodAgentUuid = await ensureAgent(RESOURCE_NAMES.foodAgent, FOOD_INSTRUCTION, modelUuid, [kb.uuid]);
+  state.foodAgentUuid = await ensureAgent(RESOURCE_NAMES.foodAgent, FOOD_INSTRUCTION, modelUuid, projectId, [kb.uuid]);
 
   // --- A1.4 Function route: register /screen (via FaaS proxy) on the Food agent ---
   const faasNamespace = process.env.FAAS_NAMESPACE?.trim();
@@ -133,7 +155,7 @@ async function main() {
   }
 
   // --- A1.5 Router agent + route to Food ---
-  state.routerAgentUuid = await ensureAgent(RESOURCE_NAMES.routerAgent, ROUTER_INSTRUCTION, modelUuid);
+  state.routerAgentUuid = await ensureAgent(RESOURCE_NAMES.routerAgent, ROUTER_INSTRUCTION, modelUuid, projectId);
   try {
     await client.agents.routes.add(state.foodAgentUuid, {
       path_parent_agent_uuid: state.routerAgentUuid,
@@ -163,6 +185,8 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('\n[provision] ERROR:', e.message ?? e);
+  const detail = e?.error?.message ?? e?.message ?? String(e);
+  console.error('\n[provision] ERROR:', detail);
+  if (e?.error) console.error(JSON.stringify(e.error, null, 2));
   process.exit(1);
 });
