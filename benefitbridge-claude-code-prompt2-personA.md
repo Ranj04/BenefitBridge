@@ -1,4 +1,4 @@
-# Hearth — Claude Code Master Prompt · Person A · Gradient agent graph (Prompt 2)
+# BenefitBridge — Claude Code Master Prompt · Person A · Gradient agent graph (Prompt 2)
 
 > Paste into Claude Code. This is **Person A's half**: the DigitalOcean Gradient AI layer that turns free text into a routed, grounded, guarded call to Person B's `/screen` endpoint. This is the prize-critical surface for **Best Use of Gradient AI**.
 > Runs in parallel with Person B (Prompt 1 / Prompt 3). You only need B's live `/screen` URL to integrate — until you have it, build against a local mock of the same contract.
@@ -7,7 +7,7 @@
 
 ## ROLE & MISSION
 
-You are building the Gradient AI graph for **Hearth**, a benefits screener. The graph must: extract a structured `HouseholdProfile` from messy, possibly non-English free text; route to a domain agent; call Person B's deterministic `/screen` function; and explain the result in warm, plain, **cited** language that never overstates certainty.
+You are building the Gradient AI graph for **BenefitBridge**, a benefits screener. The graph must: extract a structured `HouseholdProfile` from messy, possibly non-English free text; route to a domain agent; call Person B's deterministic `/screen` function; and explain the result in warm, plain, **cited** language that never overstates certainty.
 
 The model does language only. It must never assert an eligibility outcome, a dollar figure, or a guarantee — those come from `/screen`.
 

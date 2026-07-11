@@ -109,9 +109,8 @@ This repo is currently in the planning stage: it holds the build plan and the Cl
 | `benefits-navigator-plan.md` | The master build plan: product vision, architecture, track strategy, risk register, demo script |
 | `benefitbridge-claude-code-full-sequence.md` | The full nine-prompt build sequence with standing rules and run order |
 | `benefitbridge-claude-code-phase0-1.md` | Prompt 1 — the backend spine: CalFresh cascade + `/screen` endpoint |
-| `hearth-claude-code-prompt2-personA.md` | Prompt 2 — the Gradient agent graph, knowledge bases, and guardrails |
-
-(You'll notice earlier working names, "Benefit" and "Hearth," in a couple of docs. Same project.)
+| `benefitbridge-claude-code-prompt2-personA.md` | Prompt 2 — the Gradient agent graph, knowledge bases, and guardrails |
+| `benefitbridge-claude-code-prompt3.5-live-data.md` | Prompt 3.5 — live FPL data layer from HHS ASPE API |
 
 ### Build sequence
 
