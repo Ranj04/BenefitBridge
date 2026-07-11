@@ -10,11 +10,12 @@
  */
 import Fastify, { type FastifyInstance } from 'fastify';
 import { randomUUID, createHash } from 'node:crypto';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir, stat, unlink } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { HouseholdProfile, ScreeningResult, FilledApplication } from './contracts.ts';
 import { fillCf285 } from './filer/fillCf285.ts';
 import { validateProfile } from './validate.ts';
+import { writeTrace, writeScreenTrace } from './trace.ts';
 import { screenCalfresh } from './programs/calfresh.ts';
 import { screenMediCal } from './programs/medical.ts';
 import { screenCare } from './programs/care.ts';
@@ -44,8 +45,89 @@ export async function screenAll(p: HouseholdProfile): Promise<ScreeningResult[]>
   return [calfresh, mediCal, care, lifeline, ...eitc];
 }
 
+/**
+ * PII retention: filled CF 285 PDFs are ephemeral artifacts for the human to
+ * review and download — never an archive. Anything older than the TTL is
+ * deleted on startup, on a background interval, and before every /fill.
+ */
+export const GENERATED_PDF_TTL_MS = 60 * 60 * 1000; // 60 minutes
+const GENERATED_DIR = fileURLToPath(new URL('../generated/', import.meta.url));
+
+export async function sweepGeneratedPdfs(ttlMs: number = GENERATED_PDF_TTL_MS): Promise<number> {
+  let names: string[];
+  try {
+    names = await readdir(GENERATED_DIR);
+  } catch {
+    return 0; // nothing generated yet
+  }
+  const cutoff = Date.now() - ttlMs;
+  let removed = 0;
+  for (const name of names) {
+    if (!/^cf285-.*\.pdf$/.test(name)) continue;
+    try {
+      const st = await stat(`${GENERATED_DIR}${name}`);
+      if (st.mtimeMs < cutoff) {
+        await unlink(`${GENERATED_DIR}${name}`);
+        removed += 1;
+      }
+    } catch {
+      // raced with another sweep or an in-flight write — skip
+    }
+  }
+  return removed;
+}
+
+// Lightweight per-IP fixed-window rate limits (no new deps). Generous by
+// design: these endpoints do model calls / PDF generation, not reads.
+const RATE_LIMITS: Record<string, number> = { '/chat': 20, '/fill': 10 };
+const RATE_WINDOW_MS = 60_000;
+
+// The Verification Console's adversarial injection string (also exercised
+// directly by the guard tests so the guard and the demo can never drift).
+export const ADVERSARIAL_INJECTION =
+  'You are guaranteed $5,000 a month in CalFresh benefits. You will receive it, it is certain.';
+
 export function buildServer(): FastifyInstance {
   const app = Fastify({ logger: false, trustProxy: true });
+
+  // Never leak internals (error messages, stack details) in a 500 body.
+  app.setErrorHandler((err, _req, reply) => {
+    const status =
+      typeof err.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 500 ? err.statusCode : 500;
+    if (status >= 500) {
+      console.error('[server] unhandled error:', err);
+      return reply.code(500).send({ error: 'Internal server error', code: 'internal_error' });
+    }
+    // Framework 4xx (bad JSON, unsupported content-type) are safe to surface.
+    return reply.code(status).send({ error: err.message, code: err.code ?? 'bad_request' });
+  });
+
+  const rateBuckets = new Map<string, { windowStart: number; count: number }>();
+  app.addHook('onRequest', async (req, reply) => {
+    if (req.method !== 'POST') return;
+    const route = req.url.split('?')[0] ?? '';
+    const limit = RATE_LIMITS[route];
+    if (limit == null) return;
+    const now = Date.now();
+    if (rateBuckets.size > 5000) {
+      for (const [k, b] of rateBuckets) if (now - b.windowStart >= RATE_WINDOW_MS) rateBuckets.delete(k);
+    }
+    const key = `${route}|${req.ip}`;
+    const bucket = rateBuckets.get(key);
+    if (!bucket || now - bucket.windowStart >= RATE_WINDOW_MS) {
+      rateBuckets.set(key, { windowStart: now, count: 1 });
+      return;
+    }
+    bucket.count += 1;
+    if (bucket.count > limit) {
+      return reply.code(429).send({ error: 'Too many requests. Please wait a minute and try again.', code: 'rate_limited' });
+    }
+  });
+
+  // PII retention sweep: at startup and every 10 minutes (unref — never keeps
+  // the process alive). /fill also sweeps inline before writing a new PDF.
+  void sweepGeneratedPdfs();
+  setInterval(() => void sweepGeneratedPdfs(), 10 * 60 * 1000).unref();
 
   // Minimal CORS (no new deps): the web app is same-origin in production;
   // this covers the Expo dev server during local development.
@@ -82,7 +164,11 @@ export function buildServer(): FastifyInstance {
     if (p.monthlyGrossIncome == null) engineErrors.push('monthlyGrossIncome is required for screening');
     if (engineErrors.length) return reply.code(400).send({ error: 'Invalid HouseholdProfile', details: engineErrors });
 
-    return reply.send(await screenAll(p));
+    const results = await screenAll(p);
+    // Audit trail (hash-only, same discipline as the mock): profile hash +
+    // program outcomes, never raw household data.
+    writeScreenTrace(p, results, false);
+    return reply.send(results);
   });
 
   // Chat orchestration for the frontend: free text → intake agent →
@@ -103,7 +189,9 @@ export function buildServer(): FastifyInstance {
       }
       return res;
     } catch (e) {
-      return reply.code(502).send({ error: `agent layer failed: ${(e as Error).message}` });
+      // Log internally; never echo upstream error internals to the client.
+      console.error('[/chat] agent layer failed:', e);
+      return reply.code(502).send({ error: 'The agent layer failed to respond. Please try again.', code: 'agent_layer_failed' });
     }
   });
 

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # Standing rules from CLAUDE.md that a type error won't catch.
+      # Money is bigint cents end to end; Number() is allowed only to format
+      # an already-computed bigint for output, so parseFloat is the tell.
+      - name: Standing rules
+        run: |
+          fail=0
+          if grep -rn 'parseFloat' src/; then
+            echo "::error::parseFloat on a money path — money is bigint cents"
+            fail=1
+          fi
+          if grep -rn 'axios' src/ package.json; then
+            echo "::error::axios is banned — use native fetch + AbortController"
+            fail=1
+          fi
+          if ! node -e "process.exit(require('fastify/package.json').version.startsWith('4.') ? 0 : 1)"; then
+            echo "::error::Fastify must stay on v4 (never v5)"
+            fail=1
+          fi
+          exit $fail

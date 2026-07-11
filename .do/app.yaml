@@ -1,0 +1,56 @@
+features:
+- buildpack-stack=ubuntu-22
+ingress:
+  rules:
+  - component:
+      name: web
+    match:
+      path:
+        prefix: /app
+  - component:
+      name: screen
+    match:
+      path:
+        prefix: /
+name: benefitbridge-screen
+region: tor
+services:
+- build_command: npm ci
+  environment_slug: node-js
+  envs:
+  - key: AGENT_INTAKE_URL
+    scope: RUN_TIME
+    value: https://s4ozo2lspazo35pnahixd72y.agents.do-ai.run
+  - key: AGENT_INTAKE_KEY
+    scope: RUN_TIME
+    type: SECRET
+    value: EV[1:dd0EUKaS02//HZp8Q15Ib3ClkLGLlSNT:rQkr714UC/Fr+bGR3vyoy9F+r1mRK6x57sofr6hJ4eI8ZXMPBc9C5D0T56UEQkX+]
+  - key: AGENT_FOOD_URL
+    scope: RUN_TIME
+    value: https://lrp5gqv6kazmd5zmmz77f76n.agents.do-ai.run
+  - key: AGENT_FOOD_KEY
+    scope: RUN_TIME
+    type: SECRET
+    value: EV[1:m4Q3yKUoI4TZp6G27E6j1Ki9QXP5mfsr:3r/PEaqBU+Hthu1KKgQtqOS+nHBPVvd6DjSddrJUBXnUavl3+lxmlo7McGBA9iZZ]
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: Ranj04/BenefitBridge
+  health_check:
+    http_path: /health
+    initial_delay_seconds: 10
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  name: screen
+  run_command: npm start
+  source_dir: /
+static_sites:
+- build_command: npm ci --legacy-peer-deps && npx expo export --platform web
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: Ranj04/BenefitBridge
+  name: web
+  output_dir: dist
+  source_dir: app

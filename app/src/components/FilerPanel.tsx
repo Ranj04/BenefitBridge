@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, Pressable, Linking, ActivityIndicator } from 'react-native';
 import type { FilledApplication, NullableProfile } from '../types';
+import type { Strings } from '../i18n';
 import { api } from '../api';
 import { cardShadow } from '../theme/shadow';
 import { T } from '../theme/tokens';
@@ -11,13 +12,23 @@ import { ConsentGate } from './ConsentGate';
  * the official CF 285 for review; THE USER submits it. Nothing here can
  * submit anything.
  */
-export function FilerPanel({ profile, offline, offlineFilled }: { profile: NullableProfile; offline: boolean; offlineFilled: FilledApplication | null }) {
+export function FilerPanel({
+  t,
+  profile,
+  offline,
+  offlineFilled,
+}: {
+  t: Strings;
+  profile: NullableProfile;
+  offline: boolean;
+  offlineFilled: FilledApplication | null;
+}) {
   const [filled, setFilled] = useState<FilledApplication | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const fileIt = async () => {
-    setError(null);
+    setFailed(false);
     if (offline) {
       setFilled(offlineFilled);
       return;
@@ -25,8 +36,8 @@ export function FilerPanel({ profile, offline, offlineFilled }: { profile: Nulla
     setBusy(true);
     try {
       setFilled(await api.fill(profile));
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      setFailed(true);
     } finally {
       setBusy(false);
     }
@@ -35,12 +46,9 @@ export function FilerPanel({ profile, offline, offlineFilled }: { profile: Nulla
   return (
     <View className="mb-4 rounded-card bg-hearth-surface p-5" style={cardShadow}>
       <Text className="font-display text-h3 text-ink" accessibilityRole="header">
-        Get the paperwork started
+        {t.filerTitle}
       </Text>
-      <Text className="mt-1 font-body text-caption leading-5 text-ink-muted">
-        We fill the official CalFresh application (CF 285) with what you told us — and stop there. You review it, add the personal
-        items we never guess, sign it, and submit it yourself.
-      </Text>
+      <Text className="mt-1 font-body text-caption leading-5 text-ink-muted">{t.filerBody}</Text>
 
       {!filled ? (
         <Pressable
@@ -48,33 +56,29 @@ export function FilerPanel({ profile, offline, offlineFilled }: { profile: Nulla
           onPress={fileIt}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Prepare my application"
+          accessibilityLabel={t.filerPrepare}
         >
-          {busy ? <ActivityIndicator color={T.surface} /> : <Text className="font-bodybold text-body text-white">Prepare my application</Text>}
+          {busy ? <ActivityIndicator color={T.surface} /> : <Text className="font-bodybold text-body text-white">{t.filerPrepare}</Text>}
         </Pressable>
       ) : null}
-      {error ? (
-        <Text className="mt-3 font-body text-caption text-ember-text">
-          We couldn’t prepare the form just now — your info is safe. Try again.
-        </Text>
-      ) : null}
+      {failed ? <Text className="mt-3 font-body text-caption text-ember-text">{t.filerError}</Text> : null}
 
       {filled ? (
         <View className="mt-4">
           <View className="self-start rounded-full border border-ember bg-ember-soft px-3 py-1.5">
-            <Text className="font-bodybold text-caption text-ember-text">Status: {filled.status.replace(/_/g, ' ')}</Text>
+            <Text className="font-bodybold text-caption text-ember-text">{t.filerStatus(filled.status)}</Text>
           </View>
 
           <Pressable
             className="mt-2 min-h-[48px] justify-center self-start"
             onPress={() => Linking.openURL(filled.pdfUrl)}
             accessibilityRole="link"
-            accessibilityLabel="Open the filled CF 285 PDF"
+            accessibilityLabel={t.filerOpenPdf}
           >
-            <Text className="font-bodybold text-body text-pine underline">Open the filled CF 285 (PDF) →</Text>
+            <Text className="font-bodybold text-body text-pine underline">{t.filerOpenPdf}</Text>
           </Pressable>
 
-          <Text className="mt-3 font-bodybold text-body text-ink">Filled from your answers</Text>
+          <Text className="mt-3 font-bodybold text-body text-ink">{t.filerFilledFrom}</Text>
           <View className="mt-1 rounded-card border border-fog bg-hearth px-4 py-1">
             {Object.entries(filled.fields).map(([k, v]) => (
               <View key={k} className="flex-row items-baseline gap-2 border-b border-fog py-2 last:border-b-0">
@@ -89,7 +93,7 @@ export function FilerPanel({ profile, offline, offlineFilled }: { profile: Nulla
 
           {filled.blankFields?.length ? (
             <>
-              <Text className="mt-3 font-bodybold text-body text-ink">You complete these — we never guess</Text>
+              <Text className="mt-3 font-bodybold text-body text-ink">{t.filerYouComplete}</Text>
               <View className="mt-1 rounded-card border border-fog bg-hearth px-4 py-1">
                 {filled.blankFields.map((b) => (
                   <View key={b} className="flex-row items-baseline gap-2 border-b border-fog py-2 last:border-b-0">
@@ -104,7 +108,7 @@ export function FilerPanel({ profile, offline, offlineFilled }: { profile: Nulla
           ) : null}
 
           <View className="mt-4">
-            <ConsentGate />
+            <ConsentGate t={t} />
           </View>
         </View>
       ) : null}

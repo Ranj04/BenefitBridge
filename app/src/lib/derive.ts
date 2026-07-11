@@ -6,6 +6,7 @@ import type { ScreeningResult } from '../types';
 export type HeroTotals = {
   monthly: number; // sum of likely_qualify monthly estimates (low end of ranges)
   annual: number; // sum of likely_qualify annual estimates (tax credits)
+  oneTime: number; // sum of likely_qualify one_time estimates — shown as its own line, never folded into monthly/annual
   likelyCount: number; // programs marked likely_qualify, including $-less ones
   approximate: boolean; // true when any summed amount was a range
 };
@@ -13,6 +14,7 @@ export type HeroTotals = {
 export function heroTotals(results: ScreeningResult[]): HeroTotals {
   let monthly = 0;
   let annual = 0;
+  let oneTime = 0;
   let approximate = false;
   let likelyCount = 0;
   for (const r of results) {
@@ -23,8 +25,9 @@ export function heroTotals(results: ScreeningResult[]): HeroTotals {
     const amt = typeof b.amount === 'number' ? b.amount : (approximate = true, b.amount.low);
     if (b.period === 'monthly') monthly += amt;
     else if (b.period === 'annual') annual += amt;
+    else if (b.period === 'one_time') oneTime += amt;
   }
-  return { monthly, annual, likelyCount, approximate };
+  return { monthly, annual, oneTime, likelyCount, approximate };
 }
 
 /**
