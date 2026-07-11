@@ -12,7 +12,11 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
 import { validateProfile } from './validate.ts';
 import { screenCalfresh } from './programs/calfresh.ts';
-import { ensureDataContext, toScreenContext } from './data/runtime.ts';
+import { screenMediCal } from './programs/medical.ts';
+import { screenCare } from './programs/care.ts';
+import { screenLifeline } from './programs/lifeline.ts';
+import { screenEitc } from './programs/eitc.ts';
+import { ensureDataContext, getFplBasis, toScreenContext } from './data/runtime.ts';
 
 export function buildServer(): FastifyInstance {
   const app = Fastify({ logger: false });
@@ -44,7 +48,22 @@ export function buildServer(): FastifyInstance {
     if (engineErrors.length) return reply.code(400).send({ error: 'Invalid HouseholdProfile', details: engineErrors });
 
     const ctx = await ensureDataContext(); // TTL-cached; null only if no live API and no store
-    const results: ScreeningResult[] = [screenCalfresh(p, ctx ? toScreenContext(ctx) ?? undefined : undefined)];
+    const screenCtx = ctx ? toScreenContext(ctx) ?? undefined : undefined;
+    const basis = ctx ? getFplBasis(ctx) : null;
+
+    const calfresh = screenCalfresh(p, screenCtx);
+    const mediCal = screenMediCal(p, basis, screenCtx);
+    const care = screenCare(p, basis, screenCtx);
+    // Categorical: CalFresh / Medi-Cal likelihood feeds LifeLine deterministically.
+    const lifeline = screenLifeline(
+      p,
+      basis,
+      { calfreshLikely: calfresh.screening === 'likely_qualify', mediCalLikely: mediCal.screening === 'likely_qualify' },
+      screenCtx,
+    );
+    const eitc = screenEitc(p, screenCtx); // federal (monthly→annual) + CalEITC
+
+    const results: ScreeningResult[] = [calfresh, mediCal, care, lifeline, ...eitc];
     return reply.send(results);
   });
 

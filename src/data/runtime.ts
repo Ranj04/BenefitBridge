@@ -55,6 +55,27 @@ export async function ensureDataContext(opts?: {
   return cache.ctx;
 }
 
+/** FPL basis for the FPL-percentage programs (Medi-Cal, CARE, LifeLine). */
+export function getFplBasis(ctx: DataContext, year = new Date().getFullYear()) {
+  try {
+    const annual: Record<number, number> = {};
+    let provenance: Provenance | null = null;
+    for (let hh = 1; hh <= 8; hh++) {
+      const e = getNumber(ctx.store, `fpl.annual.${year}.us.hh${hh}`);
+      annual[hh] = e.value;
+      if (hh === 1) provenance = e.provenance;
+    }
+    return {
+      year,
+      annualUsdFor: (hh: number) =>
+        hh <= 8 ? annual[Math.max(1, hh)] : annual[8] + (annual[8] - annual[7]) * (hh - 8),
+      provenance: provenance!,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** The slice of data context the engine embeds into a ScreeningResult. */
 export type ScreenDataContext = {
   version: number;
