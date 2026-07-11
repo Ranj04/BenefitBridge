@@ -9,6 +9,11 @@ import type { HouseholdProfile, ScreeningResult } from './contracts.ts';
 import { config } from './config.ts';
 import { makeAgentClient } from './gradient.ts';
 import { validateProfile } from './validate.ts';
+import {
+  SCREEN_FALLBACK_APPLY_URL,
+  SCREEN_FALLBACK_CITATIONS,
+  SCREEN_FALLBACK_DISCLAIMER,
+} from './screen-fallback.ts';
 
 export type GraphState = {
   intakeEndpoint: string;
