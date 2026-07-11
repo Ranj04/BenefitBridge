@@ -9,3 +9,4 @@ guardrail-capture.json
 do-function/.env
 do-function/.deployed/
 .claude/projects/
+traces/
