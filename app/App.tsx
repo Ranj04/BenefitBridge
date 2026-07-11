@@ -8,6 +8,10 @@ import type { ChatResponse, FilledApplication, AdversarialResult } from './src/t
 import { ResultCard } from './src/components/ResultCard';
 import { VerificationConsole } from './src/components/VerificationConsole';
 import { FilerPanel } from './src/components/FilerPanel';
+import { LanguageSelector } from './src/components/LanguageSelector';
+import { useVoiceInput } from './src/hooks/useVoiceInput';
+import { useVoiceOutput } from './src/hooks/useVoiceOutput';
+import { STRINGS, bcp47For, defaultLanguage, type LangCode } from './src/i18n';
 import offlineFixture from './fixtures/offline.json';
 
 // Three one-click demo personas (Prompt 5 task 5).
@@ -31,11 +35,22 @@ export default function App() {
   const [chat, setChat] = useState<ChatResponse | null>(null);
   const [offline, setOffline] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
+  const [lang, setLang] = useState<LangCode>(defaultLanguage);
+  const t = STRINGS[lang];
+
+  // Voice is an input transform only: finalized speech appends to the SAME
+  // editable field the user types into; the user reviews and hits Check.
+  const voice = useVoiceInput({
+    lang: bcp47For(lang),
+    onFinal: (chunk) => setText((prev) => (prev.trim() ? `${prev.trim()} ${chunk}` : chunk)),
+  });
+  const tts = useVoiceOutput();
 
   const run = async (input: string, personaKey: string | null) => {
     setError(null);
     setChat(null);
     setConsoleOpen(false);
+    tts.stop();
     if (offline) {
       // OFFLINE MODE: labeled replay of a committed REAL capture — never silent.
       setChat(FIXTURE.personas[personaKey ?? 'p1'] ?? FIXTURE.personas.p1 ?? null);
@@ -43,7 +58,7 @@ export default function App() {
     }
     setBusy(true);
     try {
-      setChat(await api.chat(input));
+      setChat(await api.chat(input, lang));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -72,6 +87,15 @@ export default function App() {
             <Text className="mt-1 text-xs text-indigo-200">
               Every figure below is an estimate, never a determination. The model does language; the math is deterministic code.
             </Text>
+            <View className="mt-2">
+              <LanguageSelector
+                value={lang}
+                onChange={(code) => {
+                  tts.stop();
+                  setLang(code);
+                }}
+              />
+            </View>
           </View>
         </View>
 
@@ -85,7 +109,7 @@ export default function App() {
 
         <ScrollView className="flex-1" contentContainerClassName="px-4 py-4">
           <View className="mx-auto w-full max-w-3xl">
-            <Text className="text-sm font-semibold text-slate-700">Tell us about your household — any language</Text>
+            <Text className="text-sm font-semibold text-slate-700">{t.heading}</Text>
             <View className="mt-2 flex-row flex-wrap gap-2">
               {PERSONAS.map((p) => (
                 <Pressable
@@ -103,23 +127,57 @@ export default function App() {
             </View>
 
             <View className="mt-3 flex-row items-end gap-2">
+              {/* The text field is ALWAYS visible and authoritative — voice only populates it. */}
               <TextInput
                 className="min-h-[48px] flex-1 rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900"
                 multiline
-                placeholder='e.g. "single mom in SF, about $2,800 a month, one kid, renting"'
+                placeholder={t.placeholder}
                 placeholderTextColor="#94a3b8"
                 value={text}
                 onChangeText={setText}
                 accessibilityLabel="Describe your household"
               />
+              {voice.supported && (
+                <Pressable
+                  className={`rounded-xl px-4 py-3 ${voice.listening ? 'bg-rose-600' : 'border border-brand bg-white'}`}
+                  onPress={voice.toggle}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={voice.listening ? t.micStop : t.micStart}
+                  accessibilityState={{ selected: voice.listening }}
+                >
+                  <Text className={`text-sm font-bold ${voice.listening ? 'text-white' : 'text-brand-dark'}`}>
+                    {voice.listening ? '⏹' : '🎤'}
+                  </Text>
+                </Pressable>
+              )}
               <Pressable
                 className="rounded-xl bg-brand px-4 py-3"
                 onPress={() => void run(text, null)}
                 disabled={busy || !text.trim()}
+                accessibilityRole="button"
                 accessibilityLabel="Check my benefits"
               >
-                <Text className="text-sm font-bold text-white">Check</Text>
+                <Text className="text-sm font-bold text-white">{t.check}</Text>
               </Pressable>
+            </View>
+
+            {/* ARIA live region: announces listening state + voice errors to screen readers. */}
+            <View accessibilityLiveRegion="polite">
+              {voice.listening && (
+                <View className="mt-2 flex-row items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2">
+                  <View className="h-2.5 w-2.5 animate-pulse rounded-full bg-rose-600" />
+                  <Text className="flex-1 text-xs font-semibold text-rose-700">{t.listening}</Text>
+                </View>
+              )}
+              {voice.listening && !!voice.interim && (
+                <Text className="mt-1 px-1 text-sm italic text-slate-500">{voice.interim}</Text>
+              )}
+              {voice.error && (
+                <Text className="mt-2 text-xs text-amber-700">
+                  {voice.error === 'denied' ? t.micDenied : voice.error === 'no-speech' ? t.micNoSpeech : voice.error === 'network' ? t.micNetwork : t.micUnavailable}
+                </Text>
+              )}
             </View>
 
             {busy && (
@@ -146,7 +204,25 @@ export default function App() {
 
             {chat?.explanation && (
               <View className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                <Text className="text-xs font-bold uppercase tracking-wide text-slate-500">What this means for you</Text>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-xs font-bold uppercase tracking-wide text-slate-500">What this means for you</Text>
+                  {tts.supported && (
+                    <Pressable
+                      className={`rounded-full border px-3 py-1 ${tts.speaking ? 'border-rose-400 bg-rose-50' : 'border-brand bg-white'}`}
+                      onPress={() =>
+                        // Speaks the SAME disclaimered explanation shown above —
+                        // never a bare figure restated as a guarantee.
+                        tts.speaking ? tts.stop() : tts.speak(chat.explanation!, bcp47For(lang))
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={tts.speaking ? t.stopReading : t.readAloud}
+                    >
+                      <Text className={`text-xs font-bold ${tts.speaking ? 'text-rose-700' : 'text-brand-dark'}`}>
+                        {tts.speaking ? `⏹ ${t.stopReading}` : `🔊 ${t.readAloud}`}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
                 <Text className="mt-1 text-sm leading-5 text-slate-800">{chat.explanation}</Text>
               </View>
             )}
