@@ -65,4 +65,5 @@ If building AI pipelines, document processing, RAG, or data integration with Roc
 | `benefits-navigator-plan.md` | Master plan: vision, architecture, risks, demo script |
 | `benefitbridge-claude-code-full-sequence.md` | All nine phase prompts, run order, standing rules |
 | `benefitbridge-claude-code-phase0-1.md` | Phase 0–1: CalFresh engine + `/screen` endpoint |
-| `hearth-claude-code-prompt2-personA.md` | Phase 2: Gradient agent graph + guardrails ("Hearth" is an old working name) |
+| `benefitbridge-claude-code-prompt2-personA.md` | Phase 2: Gradient agent graph + guardrails |
+| `benefitbridge-claude-code-prompt3.5-live-data.md` | Phase 3.5: live FPL data layer (HHS ASPE API) |
