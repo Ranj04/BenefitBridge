@@ -10,8 +10,10 @@ export type ValidationResult = { ok: boolean; errors: string[] };
 /**
  * Validate a raw object parsed from the intake agent against HouseholdProfile.
  * Intake emits null for unstated fields; we treat null/undefined as "absent" and
- * only type-check the values that ARE present. The two always-required identity
- * fields (countyFips, preferredLanguage) must be present.
+ * only type-check the values that ARE present. preferredLanguage is the one
+ * always-required field (intake always detects it). countyFips is unstated-is-
+ * null like the rest: a sentence with no location must NOT fail validation —
+ * the orchestrator coerces null to San Francisco with a labeled assumption.
  */
 export function validateProfile(raw: unknown): ValidationResult {
   const errors: string[] = [];
@@ -38,7 +40,7 @@ export function validateProfile(raw: unknown): ValidationResult {
   if (p.householdSize !== null && p.householdSize !== undefined && (typeof p.householdSize !== 'number' || p.householdSize < 1)) {
     errors.push('householdSize, when present, must be an integer >= 1');
   }
-  if (typeof p.countyFips !== 'string' || p.countyFips.length === 0) errors.push('countyFips is required (string)');
+  if (p.countyFips != null && (typeof p.countyFips !== 'string' || p.countyFips.length === 0)) errors.push('countyFips must be a non-empty string or null');
   if (typeof p.preferredLanguage !== 'string' || p.preferredLanguage.length === 0) errors.push('preferredLanguage is required (string)');
   if (p.immigrationStatus != null && !['citizen', 'lpr', 'other'].includes(p.immigrationStatus as string)) {
     errors.push("immigrationStatus must be 'citizen' | 'lpr' | 'other' | null");
