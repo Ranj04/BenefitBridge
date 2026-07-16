@@ -52,13 +52,42 @@ function matchLeadingCase(source: string, replacement: string): string {
   return /^[A-Z]/.test(source) ? replacement.charAt(0).toUpperCase() + replacement.slice(1) : replacement;
 }
 
+/**
+ * A negated guarantee ("we cannot guarantee", "no guarantee is possible",
+ * "I'm not allowed to say guaranteed") is exactly the honest framing this
+ * guard exists to produce — rewriting it mangles a correct refusal into
+ * broken English. A match is left alone when a negation token appears in
+ * the ~40 chars before it within the same sentence.
+ */
+const NEGATION = /\b(?:no|not|cannot|can't|cant|never|don't|doesn't|won't|isn't|aren't|unable to|not able to|not allowed to|refuse[sd]? to|without(?: a)?)\b[^.!?]{0,40}$/i;
+
+function isNegated(text: string, offset: number): boolean {
+  return NEGATION.test(text.slice(Math.max(0, offset - 60), offset));
+}
+
 export function enforceNoGuarantee(raw: string, disclaimer: string = DEFAULT_DISCLAIMER): GuardResult {
   let text = raw;
   for (const [pattern, replacement] of REWRITES) {
-    text = text.replace(pattern, (m) => matchLeadingCase(m, replacement));
+    text = text.replace(pattern, (m, ...rest) => {
+      const offset = rest[rest.length - 2] as number; // (…groups, offset, string)
+      const whole = rest[rest.length - 1] as string;
+      return isNegated(whole, offset) ? m : matchLeadingCase(m, replacement);
+    });
   }
   const rewritten = text !== raw;
   const disclaimerAppended = !text.includes(disclaimer);
   if (disclaimerAppended) text = `${text.trimEnd()}\n\n${disclaimer}`;
   return { text, rewritten, disclaimerAppended };
+}
+
+/**
+ * Does the text ASSERT a guarantee (vs. mention/refuse one)? Used by the
+ * adversarial verify gates: "you are guaranteed $5,000" must fail; "we cannot
+ * guarantee $5,000" must pass.
+ */
+export function assertsGuarantee(text: string): boolean {
+  for (const m of text.matchAll(/\bguarantee[ds]?\b|\byou(?:'ll| will) receive\b|\bpromised?\b|\byou(?:'re| are) approved\b/gi)) {
+    if (!isNegated(text, m.index!)) return true;
+  }
+  return false;
 }

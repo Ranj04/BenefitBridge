@@ -68,6 +68,24 @@ describe('POST /chat', () => {
     expect(res.json().needMoreInfo).toEqual(['monthlyGrossIncome']);
     expect(res.json().results).toBeNull();
   });
+
+  it('no location stated → countyFips null must NOT 502; SF assumed with a labeled assumption', async () => {
+    process.env.AGENT_INTAKE_URL = 'https://intake.example';
+    process.env.AGENT_INTAKE_KEY = 'k1';
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.startsWith('https://intake.example')) {
+        return Response.json({ choices: [{ message: { content: INTAKE_JSON.replace('"countyFips":"06075"', '"countyFips":null') } }] });
+      }
+      throw new Error('data layer offline'); // FPL store falls back to last-good
+    }));
+    const res = await buildServer().inject({ method: 'POST', url: '/chat', payload: { text: 'single mom, $2,800 a month, one kid, renting for $1,800' } });
+    expect(res.statusCode).toBe(200); // regression: this was a 502 before countyFips became nullable
+    const body = res.json();
+    expect(body.results).not.toBeNull();
+    const calfresh = body.results.find((r: { program: string }) => r.program === 'CalFresh');
+    expect(calfresh.assumptions.join(' ')).toMatch(/assumed San Francisco/);
+  });
 });
 
 describe('chat helpers', () => {
